@@ -7,7 +7,7 @@
 
 import { z } from "zod";
 
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 
 export const StatDefinitionSchema = z.object({
   id: z.string().min(1),
@@ -86,6 +86,88 @@ export const UserSettingsSchema = z.object({
   maxLogRetention: z.number().int().positive(),
 });
 
+/* ------------------------------------------------------------------ */
+/* Season Rank Schemas                                                */
+/* ------------------------------------------------------------------ */
+
+export const RankTierSchema = z.enum([
+  "recruit",
+  "bronze",
+  "silver",
+  "gold",
+  "platinum",
+  "diamond",
+  "master",
+  "apex",
+]);
+
+export const RankDivisionSchema = z.enum(["III", "II", "I"]);
+
+export const WeeklyRankedMissionSchema = z.object({
+  id: z.string().min(1),
+  weekKey: z.string().regex(/^\d{4}-W\d{2}$/),
+  title: z.string().min(1),
+  description: z.string(),
+  targetCount: z.number().int().positive(),
+  currentCount: z.number().int().nonnegative(),
+  completed: z.boolean(),
+  completedAt: z.string().optional(),
+  srReward: z.number().int().nonnegative(),
+});
+
+export const SeasonHistoryRecordSchema = z.object({
+  seasonId: z.string().regex(/^\d{4}-\d{2}$/),
+  seasonNumber: z.number().int().positive(),
+  label: z.string().min(1),
+  finalTier: RankTierSchema,
+  finalDivision: RankDivisionSchema.nullable(),
+  finalSr: z.number().int().nonnegative(),
+  peakTier: RankTierSchema,
+  peakDivision: RankDivisionSchema.nullable(),
+  completedAt: z.string(),
+});
+
+export const SeasonRankDailyCapsSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  taskSrEarned: z.number().int().nonnegative(),
+  habitSrEarned: z.number().int().nonnegative(),
+  focusSrEarned: z.number().int().nonnegative(),
+});
+
+export const SeasonRankEvidenceSchema = z.object({
+  creditedActivityIds: z.array(z.string()),
+  qualifyingSessionTimestamps: z.array(z.string()),
+  activeCalendarDates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
+  claimedWeeklyMissionKeys: z.array(z.string()),
+});
+
+export const PreviousSeasonSummarySchema = z.object({
+  seasonId: z.string().regex(/^\d{4}-\d{2}$/),
+  label: z.string().min(1),
+  finalTier: RankTierSchema,
+  finalDivision: RankDivisionSchema.nullable(),
+  finalSr: z.number().int().nonnegative(),
+});
+
+export const SeasonRankStateSchema = z.object({
+  currentSeasonId: z.string().regex(/^\d{4}-\d{2}$/),
+  currentSeasonLabel: z.string().min(1),
+  tier: RankTierSchema,
+  division: RankDivisionSchema.nullable(),
+  sr: z.number().int().nonnegative(),
+  seasonalPeakTier: RankTierSchema,
+  seasonalPeakDivision: RankDivisionSchema.nullable(),
+  allTimePeakTier: RankTierSchema,
+  allTimePeakDivision: RankDivisionSchema.nullable(),
+  provisionalActivitiesCount: z.number().int().nonnegative(),
+  isProvisional: z.boolean(),
+  weeklyMission: WeeklyRankedMissionSchema,
+  dailyCaps: SeasonRankDailyCapsSchema,
+  evidence: SeasonRankEvidenceSchema,
+  history: z.array(SeasonHistoryRecordSchema),
+  previousSeasonSummary: PreviousSeasonSummarySchema.optional(),
+});
+
 export const AppStateSchema = z.object({
   progression: UserProgressionSchema,
   stats: z.record(z.string(), StatValueSchema),
@@ -95,6 +177,7 @@ export const AppStateSchema = z.object({
   habits: z.array(HabitSchema),
   activityLogs: z.array(ActivityLogSchema),
   settings: UserSettingsSchema,
+  seasonRank: SeasonRankStateSchema,
 });
 
 export const StorageEnvelopeSchema = z.object({

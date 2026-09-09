@@ -6,7 +6,7 @@ A personal study, to-do, lifestyle, and progression application built with Next.
 - **Zero Server-Runtime Static Deployment**: Built as a purely static export (`output: 'export'`) hosted on Vercel without Node.js server dependencies or server-side state.
 - **Privacy & Durability First**: All application state resides exclusively in client-side storage (`localStorage`) behind a clean storage abstraction.
 - **Pure Domain Engine**: Leveling math, XP curves, habit streaks, and stat updates are decoupled from React and browser APIs for complete testability.
-- **Robust Data Lifecycle**: Stable namespaced keys (`personal_app:state`), envelope schema versioning (`CURRENT_SCHEMA_VERSION = 1`), non-destructive corrupt-data handling, estimated storage metrics, and user-visible log compaction.
+- **Robust Data Lifecycle**: Stable namespaced keys (`personal_app:state`), envelope schema versioning (`CURRENT_SCHEMA_VERSION = 2`), non-destructive corrupt-data handling, estimated storage metrics, and user-visible log compaction.
 - **Safe Backup & Restore**: In-memory schema validation and migrations, accidental-corruption checksumming (FNV-1a), confirmation gates, and automatic pre-import safety snapshots (`personal_app:backup:pre_import`).
 
 Detailed architectural specifications, layer contracts, and non-goals are documented in [ARCHITECTURE.md](./ARCHITECTURE.md).

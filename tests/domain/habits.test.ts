@@ -99,4 +99,58 @@ describe("Domain: Habit / Ritual Operations", () => {
     expect(deleteRes.habitDeleted).toBe(true);
     expect(deleteRes.nextState.habits.some((h) => h.id === habit.id)).toBe(false);
   });
+
+  describe("Season Rank Integration in Habits", () => {
+    it("awards 5 SR to Season Rank upon habit completion and respects 10 SR/day habit cap", () => {
+      const state = createInitialAppState();
+      const { nextState: withHabit1, habit: h1 } = createHabit(state, {
+        title: "Meditation",
+        xpReward: 20,
+      });
+      const { nextState: withBoth, habit: h2 } = createHabit(withHabit1, {
+        title: "Reading",
+        xpReward: 20,
+      });
+
+      // Habit 1 -> 5 SR
+      const res1 = completeHabit(withBoth, h1.id, "2026-09-09", "2026-09-09T08:00:00.000Z");
+      expect(res1.habitCompleted).toBe(true);
+      expect(res1.srAwarded).toBe(5);
+      expect(res1.nextState.seasonRank.sr).toBe(5);
+      expect(res1.nextState.seasonRank.dailyCaps.habitSrEarned).toBe(5);
+
+      // Habit 2 -> 5 SR (hits 10 SR cap)
+      const res2 = completeHabit(res1.nextState, h2.id, "2026-09-09", "2026-09-09T09:00:00.000Z");
+      expect(res2.habitCompleted).toBe(true);
+      expect(res2.srAwarded).toBe(5);
+      expect(res2.nextState.seasonRank.sr).toBe(10);
+      expect(res2.nextState.seasonRank.dailyCaps.habitSrEarned).toBe(10);
+
+      // Habit 3 on same day -> 0 SR due to cap
+      const { nextState: withThree, habit: h3 } = createHabit(res2.nextState, {
+        title: "Journaling",
+        xpReward: 20,
+      });
+      const res3 = completeHabit(withThree, h3.id, "2026-09-09", "2026-09-09T10:00:00.000Z");
+      expect(res3.habitCompleted).toBe(true);
+      expect(res3.srAwarded).toBe(0);
+      expect(res3.nextState.seasonRank.sr).toBe(10);
+    });
+
+    it("prevents double-crediting SR on same-day duplicate habit attempt", () => {
+      const state = createInitialAppState();
+      const { nextState: withHabit, habit } = createHabit(state, {
+        title: "Exercise",
+        xpReward: 30,
+      });
+
+      const first = completeHabit(withHabit, habit.id, "2026-09-09", "2026-09-09T08:00:00.000Z");
+      expect(first.srAwarded).toBe(5);
+
+      const duplicate = completeHabit(first.nextState, habit.id, "2026-09-09", "2026-09-09T09:00:00.000Z");
+      expect(duplicate.habitCompleted).toBe(false);
+      expect(duplicate.srAwarded).toBe(0);
+      expect(duplicate.nextState.seasonRank.sr).toBe(5);
+    });
+  });
 });

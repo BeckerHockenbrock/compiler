@@ -90,6 +90,108 @@ export interface UserSettings {
   readonly maxLogRetention: number;
 }
 
+/* ------------------------------------------------------------------ */
+/* Season Rank (Monthly Ranked Progression)                           */
+/* ------------------------------------------------------------------ */
+
+export type RankTier =
+  | "recruit"
+  | "bronze"
+  | "silver"
+  | "gold"
+  | "platinum"
+  | "diamond"
+  | "master"
+  | "apex";
+
+export type RankDivision = "III" | "II" | "I";
+
+export interface WeeklyRankedMission {
+  readonly id: string;
+  /** Format: YYYY-Www (e.g. 2026-W37) */
+  readonly weekKey: string;
+  readonly title: string;
+  readonly description: string;
+  readonly targetCount: number;
+  readonly currentCount: number;
+  readonly completed: boolean;
+  /** ISO 8601 UTC timestamp */
+  readonly completedAt?: string;
+  readonly srReward: number;
+}
+
+export interface SeasonHistoryRecord {
+  /** Format: YYYY-MM (e.g. 2026-08) */
+  readonly seasonId: string;
+  readonly seasonNumber: number;
+  readonly label: string;
+  readonly finalTier: RankTier;
+  readonly finalDivision: RankDivision | null;
+  readonly finalSr: number;
+  readonly peakTier: RankTier;
+  readonly peakDivision: RankDivision | null;
+  /** ISO 8601 UTC timestamp */
+  readonly completedAt: string;
+}
+
+export interface SeasonRankDailyCaps {
+  /** ISO calendar date (YYYY-MM-DD) in user timezone */
+  readonly date: string;
+  readonly taskSrEarned: number;
+  readonly habitSrEarned: number;
+  readonly focusSrEarned: number;
+}
+
+export interface SeasonRankEvidence {
+  /** IDs of activities that have already been credited for SR to ensure idempotency */
+  readonly creditedActivityIds: readonly string[];
+  /** ISO 8601 UTC timestamps of recent qualifying sessions for the 7-day trial window */
+  readonly qualifyingSessionTimestamps: readonly string[];
+  /** ISO calendar dates (YYYY-MM-DD) with at least one completed qualifying activity */
+  readonly activeCalendarDates: readonly string[];
+  /** Week keys (YYYY-Www) of claimed/completed weekly missions */
+  readonly claimedWeeklyMissionKeys: readonly string[];
+}
+
+export interface PromotionTrialStatus {
+  readonly isEligible: boolean;
+  readonly qualifyingSessionsCount: number;
+  readonly qualifyingSessionsTarget: number;
+  readonly activeDaysCount: number;
+  readonly activeDaysTarget: number;
+  readonly weeklyMissionCompleted: boolean;
+  readonly isProvisional: boolean;
+  readonly allMet: boolean;
+}
+
+export interface PreviousSeasonSummary {
+  readonly seasonId: string;
+  readonly label: string;
+  readonly finalTier: RankTier;
+  readonly finalDivision: RankDivision | null;
+  readonly finalSr: number;
+}
+
+export interface SeasonRankState {
+  /** Format: YYYY-MM (e.g. 2026-09) */
+  readonly currentSeasonId: string;
+  readonly currentSeasonLabel: string;
+  readonly tier: RankTier;
+  readonly division: RankDivision | null;
+  readonly sr: number;
+  readonly seasonalPeakTier: RankTier;
+  readonly seasonalPeakDivision: RankDivision | null;
+  readonly allTimePeakTier: RankTier;
+  readonly allTimePeakDivision: RankDivision | null;
+  readonly provisionalActivitiesCount: number;
+  readonly isProvisional: boolean;
+  readonly weeklyMission: WeeklyRankedMission;
+  readonly dailyCaps: SeasonRankDailyCaps;
+  readonly evidence: SeasonRankEvidence;
+  readonly history: readonly SeasonHistoryRecord[];
+  readonly previousSeasonSummary?: PreviousSeasonSummary;
+}
+
 export interface AppState {
   readonly progression: UserProgression;
   readonly stats: Readonly<Record<string, StatValue>>;
@@ -99,6 +201,7 @@ export interface AppState {
   readonly habits: readonly Habit[];
   readonly activityLogs: readonly ActivityLog[];
   readonly settings: UserSettings;
+  readonly seasonRank: SeasonRankState;
 }
 
 export interface ActivityReward {

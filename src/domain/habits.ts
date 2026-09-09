@@ -9,6 +9,10 @@ import type { AppState, Habit, HabitFrequency } from "./types";
 import { nowUtc, toLocalDate } from "./date-time";
 import { evaluateHabitCompletion } from "./streaks";
 import { applyActivityReward } from "./progression";
+import {
+  applyActivityToSeasonRank,
+  checkAndApplySeasonRollover,
+} from "./season-rank";
 
 export interface CreateHabitInput {
   readonly title: string;
@@ -27,6 +31,8 @@ export interface CompleteHabitResult {
   readonly xpAwarded: number;
   readonly levelUpOccurred: boolean;
   readonly newLevel: number;
+  readonly srAwarded?: number;
+  readonly seasonPromoted?: boolean;
 }
 
 /**
@@ -73,7 +79,8 @@ export function createHabit(
 export function completeHabit(
   currentState: AppState,
   habitId: string,
-  explicitDate?: string
+  explicitDate?: string,
+  customTimestamp?: string
 ): CompleteHabitResult {
   const targetHabit = currentState.habits.find((h) => h.id === habitId);
 
@@ -86,28 +93,37 @@ export function completeHabit(
       xpAwarded: 0,
       levelUpOccurred: false,
       newLevel: currentState.progression.level,
+      srAwarded: 0,
+      seasonPromoted: false,
     };
   }
 
+  const timestamp = customTimestamp ?? nowUtc();
+
+  // 1. Reconcile monthly rollover if crossing into a new month
+  const rollover = checkAndApplySeasonRollover(currentState, timestamp);
+  const stateToProcess = rollover.nextState;
+
   const todayDate =
-    explicitDate ?? toLocalDate(nowUtc(), currentState.settings.timeZone);
+    explicitDate ?? toLocalDate(timestamp, stateToProcess.settings.timeZone);
 
   // If already completed today, reject duplicate check-in
   if (targetHabit.lastCompletedDate === todayDate) {
     return {
-      nextState: currentState,
+      nextState: stateToProcess,
       habitCompleted: false,
       streakCurrent: targetHabit.streakCurrent,
       streakBest: targetHabit.streakBest,
       xpAwarded: 0,
       levelUpOccurred: false,
-      newLevel: currentState.progression.level,
+      newLevel: stateToProcess.progression.level,
+      srAwarded: 0,
+      seasonPromoted: false,
     };
   }
 
-  // Calculate new streak state
+  // 2. Calculate new streak state
   const streakResult = evaluateHabitCompletion(targetHabit, todayDate);
-  const timestamp = nowUtc();
 
   const updatedHabit: Habit = {
     ...targetHabit,
@@ -117,16 +133,16 @@ export function completeHabit(
     updatedAt: timestamp,
   };
 
-  const nextHabits = currentState.habits.map((h) =>
+  const nextHabits = stateToProcess.habits.map((h) =>
     h.id === habitId ? updatedHabit : h
   );
 
   const stateWithUpdatedHabit: AppState = {
-    ...currentState,
+    ...stateToProcess,
     habits: nextHabits,
   };
 
-  // Award progression rewards
+  // 3. Award progression rewards
   const rewardResult = applyActivityReward(stateWithUpdatedHabit, {
     xp: targetHabit.xpReward,
     statRewards: targetHabit.statRewards,
@@ -135,14 +151,30 @@ export function completeHabit(
     referenceId: targetHabit.id,
   });
 
+  // 4. Award Season Rank points and evaluate division/trial promotion
+  const seasonResult = applyActivityToSeasonRank(
+    rewardResult.nextState.seasonRank,
+    `${targetHabit.id}_${todayDate}`,
+    "habit",
+    timestamp,
+    stateToProcess.settings.timeZone
+  );
+
+  const finalNextState: AppState = {
+    ...rewardResult.nextState,
+    seasonRank: seasonResult.nextSeasonRank,
+  };
+
   return {
-    nextState: rewardResult.nextState,
+    nextState: finalNextState,
     habitCompleted: true,
     streakCurrent: streakResult.streakCurrent,
     streakBest: streakResult.streakBest,
     xpAwarded: targetHabit.xpReward,
     levelUpOccurred: rewardResult.levelUpOccurred,
     newLevel: rewardResult.newLevel,
+    srAwarded: seasonResult.srEarned,
+    seasonPromoted: seasonResult.promoted,
   };
 }
 

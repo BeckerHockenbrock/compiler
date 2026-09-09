@@ -65,6 +65,11 @@ export class StorageManager {
       });
     }
 
+    const originalVersion =
+      typeof parsed === "object" && parsed !== null
+        ? Number((parsed as Record<string, unknown>).version)
+        : CURRENT_SCHEMA_VERSION;
+
     // Run in-memory migrations (if stored version < CURRENT_SCHEMA_VERSION)
     const migrationResult = runMigrationsInMemory(parsed);
     if (!migrationResult.ok) {
@@ -74,6 +79,14 @@ export class StorageManager {
         rawPayload: rawString,
         details: migrationResult.error,
       });
+    }
+
+    // Persist upgraded state back to storage if a version migration successfully occurred
+    if (originalVersion < CURRENT_SCHEMA_VERSION) {
+      const saveRes = this.saveState(migrationResult.data.state);
+      if (!saveRes.ok) {
+        return err(saveRes.error);
+      }
     }
 
     return ok(migrationResult.data.state);

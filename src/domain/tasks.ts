@@ -8,6 +8,10 @@
 import type { AppState, Task, TaskPriority } from "./types";
 import { nowUtc } from "./date-time";
 import { applyActivityReward } from "./progression";
+import {
+  applyActivityToSeasonRank,
+  checkAndApplySeasonRollover,
+} from "./season-rank";
 
 export interface CreateTaskInput {
   readonly title: string;
@@ -33,6 +37,8 @@ export interface CompleteTaskResult {
   readonly levelUpOccurred: boolean;
   readonly newLevel: number;
   readonly xpAwarded: number;
+  readonly srAwarded?: number;
+  readonly seasonPromoted?: boolean;
 }
 
 /**
@@ -140,7 +146,8 @@ export function deleteTask(
  */
 export function completeTask(
   currentState: AppState,
-  taskId: string
+  taskId: string,
+  customTimestamp?: string
 ): CompleteTaskResult {
   const targetTask = currentState.tasks.find((t) => t.id === taskId);
 
@@ -152,13 +159,19 @@ export function completeTask(
       levelUpOccurred: false,
       newLevel: currentState.progression.level,
       xpAwarded: 0,
+      srAwarded: 0,
+      seasonPromoted: false,
     };
   }
 
-  const timestamp = nowUtc();
+  const timestamp = customTimestamp ?? nowUtc();
 
-  // 1. Mark task as completed
-  const updatedTasks = currentState.tasks.map((task) => {
+  // 1. Reconcile monthly rollover if crossing into a new month
+  const rollover = checkAndApplySeasonRollover(currentState, timestamp);
+  const stateToProcess = rollover.nextState;
+
+  // 2. Mark task as completed
+  const updatedTasks = stateToProcess.tasks.map((task) => {
     if (task.id === taskId) {
       return {
         ...task,
@@ -171,11 +184,11 @@ export function completeTask(
   });
 
   const stateWithCompletedTask: AppState = {
-    ...currentState,
+    ...stateToProcess,
     tasks: updatedTasks,
   };
 
-  // 2. Award XP, stats, and log entry via progression engine
+  // 3. Award XP, stats, and log entry via progression engine
   const rewardResult = applyActivityReward(stateWithCompletedTask, {
     xp: targetTask.xpReward,
     statRewards: targetTask.statRewards,
@@ -184,11 +197,28 @@ export function completeTask(
     referenceId: targetTask.id,
   });
 
+  // 4. Award Season Rank points and evaluate division/trial promotion
+  const seasonResult = applyActivityToSeasonRank(
+    rewardResult.nextState.seasonRank,
+    targetTask.id,
+    "task",
+    timestamp,
+    stateToProcess.settings.timeZone,
+    targetTask.priority
+  );
+
+  const finalNextState: AppState = {
+    ...rewardResult.nextState,
+    seasonRank: seasonResult.nextSeasonRank,
+  };
+
   return {
-    nextState: rewardResult.nextState,
+    nextState: finalNextState,
     taskCompleted: true,
     levelUpOccurred: rewardResult.levelUpOccurred,
     newLevel: rewardResult.newLevel,
     xpAwarded: targetTask.xpReward,
+    srAwarded: seasonResult.srEarned,
+    seasonPromoted: seasonResult.promoted,
   };
 }

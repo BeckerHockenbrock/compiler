@@ -45,7 +45,7 @@ This document specifies the technical architecture, domain modeling principles, 
 │   │   └── use-app-store.ts   # Client store linking StorageManager to UI with hydration safety
 │   ├── storage/               # Persistence, validation, migration & backup layer
 │   │   ├── types.ts           # StorageAdapter interface, StorageEnvelope, error types
-│   │   ├── schema.ts          # Zod validation schemas & CURRENT_SCHEMA_VERSION = 1
+│   │   ├── schema.ts          # Zod validation schemas & CURRENT_SCHEMA_VERSION = 2
 │   │   ├── checksum.ts        # Fast FNV-1a checksum for accidental-corruption detection
 │   │   ├── compaction.ts      # User-visible log retention & compaction (preserves aggregates)
 │   │   ├── migrations/        # Sequential in-memory migration runner
@@ -121,8 +121,8 @@ interface StorageEnvelope<T> {
   state: T;            // Validated AppState
 }
 ```
-- `CURRENT_SCHEMA_VERSION = 1` is defined in `src/storage/schema.ts`.
-- No empty or dummy migration files exist. Migration files are introduced in `src/storage/migrations/` only when an actual version transition ($1 \to 2$) occurs.
+- `CURRENT_SCHEMA_VERSION = 2` is defined in `src/storage/schema.ts`.
+- Migration files are introduced in `src/storage/migrations/` when a version transition (such as $1 \to 2$) occurs.
 
 ### Non-Destructive Corrupt State Handling
 If `personal_app:state` contains malformed JSON, fails Zod validation, or references an unsupported version:
@@ -291,4 +291,72 @@ Official Developer References:
 ### API Realities & Rate Limits
 - **No Continuous Live Streaming**: The WHOOP Developer API is a REST/Webhook interface providing discrete aggregated cycle records upon calculation completion. It **does not support continuous live heart-rate streaming**; assumptions of per-second live telemetry must not be built into domain or UI models.
 - **Provider Agnosticism**: All progression and reward calculators interface exclusively with `HealthSnapshot`. Swapping WHOOP for Apple Health, Garmin, or manual logging requires only a new adapter implementing `HealthIntegrationProvider`, preserving complete core domain independence.
+- **Strict Rank & Scoring Isolation**: Physiological health metrics (recovery score, sleep debt, cardiovascular strain, illness status) **must never award or deduct Season Rank points (SR), never gate promotion trials, and never lower or penalize a user's rank**. Health data serves solely to provide personal readiness context and suggested missions. Rest is for restorative recovery, not competitive pressure.
 
+---
+
+## 10. Seasonal Ranked System Architecture (Season Rank)
+
+### Architectural Separation
+The application strictly separates **Permanent Core Progression** from **Season Rank**:
+1. **Permanent Core Progression (Never Resets)**:
+   - Lifetime XP, character level, skill point allocations, stat attributes, tasks, habits, activity logs, and backup archives are perpetual.
+   - Under no circumstances does a monthly rollover or season transition modify permanent progression totals.
+2. **Season Rank (Monthly Cadence)**:
+   - Evaluates monthly consistency, deliberate focus, and momentum.
+   - Resets on the first day of every calendar month at 00:00 local time in the user's active timezone (`settings.timeZone`).
+   - Operates without inactivity decay and without negative SR: missing a day never docks points or shames the user.
+
+### Rank Ladder & Materials (20-Rung Ordered Ladder)
+The competitive ladder consists of 20 discrete rungs across 8 tiers:
+1. **Recruit** (III, II, I) — Slate (`#94a3b8`), outlined diamond badge.
+2. **Bronze** (III, II, I) — Copper (`#cd7f32`), single-chevron shield badge.
+3. **Silver** (III, II, I) — Steel (`#cbd5e1`), double-chevron shield badge.
+4. **Gold** (III, II, I) — Muted Gold (`#eab308`), crowned hexagonal badge.
+5. **Platinum** (III, II, I) — Cyan-Blue (`#38bdf8`), split crystal badge.
+6. **Diamond** (III, II, I) — Violet-Blue (`#818cf8`), faceted diamond badge.
+7. **Master** (Single high rank) — Magenta-Blue (`#c084fc`), winged diamond badge.
+8. **Apex** (Single pinnacle rank) — White (`#ffffff`) with electric-blue halo (`#0090ff`), haloed star badge.
+
+### Scoring Dynamics & Daily Caps
+Points (Season Rank points, SR) are earned strictly through intentional daily effort:
+- **Low-priority completed task**: 3 SR
+- **Medium-priority completed task**: 6 SR
+- **High-priority completed task**: 10 SR
+- **Urgent completed task**: 15 SR
+- **Daily habit check-in**: 5 SR
+- **Daily task SR cap**: 25 SR per calendar day.
+- **Daily habit SR cap**: 10 SR per calendar day.
+- **Weekly Ranked Mission**: 25 SR (awarded upon completing 5 qualifying activities within the active ISO week `YYYY-Www`).
+- **Focus session extension point**: Designed for future timed focus blocks awarding 10 SR per completed 25-minute block, capped at 40 SR/day.
+
+### Division Progression & Promotion Trials
+- Each division requires 100 SR.
+- Advancing within a tier (e.g. Recruit III $\to$ Recruit II) occurs automatically upon reaching 100 SR.
+- Crossing a major tier boundary into Bronze, Silver, Gold, Platinum, Diamond, Master, or Apex is gated by a **Promotion Trial**:
+  1. 100 SR in the current division.
+  2. 3 qualifying productivity sessions in the last 7 calendar days.
+  3. 4 active days in the last 7 calendar days (5 active days for Master and Apex).
+  4. 1 completed weekly Ranked Mission.
+- **Provisional Status Gate**: In a new month, the user remains "Provisional" until 3 qualifying activities are completed. SR continues accruing up to 100 during provisional placement, but promotions remain strictly gated until provisional status is cleared.
+
+### Monthly Rollover & Soft Reset Math
+On the first day of each calendar month:
+1. **Archive Active Season**:
+   - The completed season is permanently archived into `seasonRank.history` with final tier, final division, final SR, peak tier/division, and completion timestamp.
+   - **Skipped-Month Protection**: If a user is inactive for multiple months (e.g. June to September), only the single last active season is archived. No duplicate or empty intermediate records are created.
+2. **Soft Reset Seeding (2 Divisions Below)**:
+   - Consistent 2-rung descent across the entire ladder ($\text{index} - 2$):
+     - Apex (19) $\to$ Diamond I (17)
+     - Master (18) $\to$ Diamond II (16)
+     - Diamond I (17) $\to$ Diamond III (15)
+     - Gold II (10) $\to$ Silver I (8)
+     - Ranks at or below Bronze III (index $\le 3$) seed cleanly to Recruit III (0).
+3. **Reset State**:
+   - SR resets to 0. Seeded rank is assigned. Provisional counter resets to 0. Daily caps reset for today.
+
+### Local Clock & Trust Boundary
+As a zero-server, static web application running entirely in the browser:
+- Storage and scheduling depend on the client machine's system clock.
+- A fully local web application cannot cryptographically prevent a user from manually altering their device clock.
+- This is an intentional, acceptable architectural reality: this application is a **private personal self-improvement workspace**, not a multi-tenant competitive public leaderboard with monetary stakes. Backward clock jumps are guarded gracefully in domain logic without data corruption or negative score generation.

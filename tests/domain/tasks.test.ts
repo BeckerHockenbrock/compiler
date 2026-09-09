@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createTask, completeTask, updateTask, deleteTask } from "@/domain/tasks";
 import { createInitialAppState } from "@/domain/defaults";
+import type { AppState } from "@/domain/types";
 
 describe("Domain: Task Operations & Idempotency", () => {
   it("creates a new task with pending status and correct rewards", () => {
@@ -176,5 +177,72 @@ describe("Domain: Task Operations & Idempotency", () => {
     expect(result.taskCompleted).toBe(false);
     expect(result.xpAwarded).toBe(0);
     expect(result.nextState).toBe(state);
+  });
+
+  describe("Season Rank Integration in Tasks", () => {
+    it("awards SR to Season Rank upon task completion, respecting daily caps and updating weekly mission", () => {
+      const state = createInitialAppState();
+      const { nextState: withTask, task } = createTask(state, {
+        title: "High priority feature",
+        priority: "high",
+        xpReward: 50,
+      });
+
+      const completion = completeTask(withTask, task.id);
+      expect(completion.taskCompleted).toBe(true);
+      expect(completion.srAwarded).toBe(10); // high priority awards 10 SR
+      expect(completion.nextState.seasonRank.sr).toBe(10);
+      expect(completion.nextState.seasonRank.dailyCaps.taskSrEarned).toBe(10);
+      expect(completion.nextState.seasonRank.weeklyMission.currentCount).toBe(1);
+    });
+
+    it("prevents double-crediting SR on duplicate task completion", () => {
+      const state = createInitialAppState();
+      const { nextState: withTask, task } = createTask(state, {
+        title: "One-off task",
+        priority: "urgent",
+        xpReward: 100,
+      });
+
+      const first = completeTask(withTask, task.id);
+      expect(first.srAwarded).toBe(15);
+      expect(first.nextState.seasonRank.sr).toBe(15);
+
+      const second = completeTask(first.nextState, task.id);
+      expect(second.taskCompleted).toBe(false);
+      expect(second.srAwarded).toBe(0);
+      expect(second.nextState.seasonRank.sr).toBe(15);
+    });
+
+    it("triggers monthly rollover if task completed across month boundary", () => {
+      // August state
+      const state: AppState = {
+        ...createInitialAppState(),
+        seasonRank: {
+          ...createInitialAppState().seasonRank,
+          currentSeasonId: "2026-08",
+          currentSeasonLabel: "Season 08 · August 2026",
+          tier: "gold",
+          division: "II",
+          sr: 80,
+        },
+      };
+
+      const { nextState: withTask, task } = createTask(state, {
+        title: "September first task",
+        priority: "low",
+        xpReward: 25,
+      });
+
+      // Complete on 2026-09-01
+      const res = completeTask(withTask, task.id, "2026-09-01T08:00:00.000Z");
+      expect(res.taskCompleted).toBe(true);
+
+      // Month rolled over: seeded from Gold II -> Silver I, then +3 SR from low task = 3 SR
+      expect(res.nextState.seasonRank.currentSeasonId).toBe("2026-09");
+      expect(res.nextState.seasonRank.tier).toBe("silver");
+      expect(res.nextState.seasonRank.division).toBe("I");
+      expect(res.nextState.seasonRank.sr).toBe(3);
+    });
   });
 });

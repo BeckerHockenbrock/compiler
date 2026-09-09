@@ -8,8 +8,15 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import type { AppState } from "@/domain/types";
+import type { AppState, PromotionTrialStatus } from "@/domain/types";
 import { calculateLevel, type LevelProgress } from "@/domain/progression";
+import {
+  checkAndApplySeasonRollover,
+  evaluatePromotionTrial,
+  findLadderIndex,
+  getRankRung,
+} from "@/domain/season-rank";
+import { toLocalDate, nowUtc } from "@/domain/date-time";
 import {
   createTask,
   updateTask,
@@ -54,6 +61,8 @@ export interface UseAppStoreReturn {
   readonly error: StorageError | null;
   readonly metrics: EstimatedStorageMetrics | null;
   readonly levelProgress: LevelProgress | null;
+  readonly promotionTrial: PromotionTrialStatus | null;
+  readonly reconcileRollover: () => void;
 
   // Task Actions
   readonly addTask: (input: CreateTaskInput) => boolean;
@@ -90,13 +99,34 @@ export function useAppStore(): UseAppStoreReturn {
     }
   }, []);
 
-  // Load state upon client mount to avoid SSR hydration mismatches
+  // Reconcile monthly rollover safely
+  const reconcileRollover = useCallback(() => {
+    setState((currentState) => {
+      if (!currentState) return currentState;
+      const { nextState, rolledOver } = checkAndApplySeasonRollover(currentState);
+      if (rolledOver) {
+        const { manager } = getStorageInstances();
+        manager.saveState(nextState);
+        return nextState;
+      }
+      return currentState;
+    });
+  }, []);
+
+  // Load state upon client mount to avoid SSR hydration mismatches and reconcile rollover
   useEffect(() => {
     const { manager } = getStorageInstances();
     const result = manager.loadState();
 
     if (result.ok) {
-      setState(result.data);
+      const loaded = result.data;
+      const { nextState, rolledOver } = checkAndApplySeasonRollover(loaded);
+      if (rolledOver) {
+        manager.saveState(nextState);
+        setState(nextState);
+      } else {
+        setState(loaded);
+      }
       setError(null);
     } else {
       setError(result.error);
@@ -105,10 +135,41 @@ export function useAppStore(): UseAppStoreReturn {
     setIsHydrated(true);
   }, [refreshMetrics]);
 
+  // Event listeners for window focus and document visibilitychange
+  useEffect(() => {
+    const handleReconcile = () => {
+      reconcileRollover();
+    };
+
+    window.addEventListener("focus", handleReconcile);
+    document.addEventListener("visibilitychange", handleReconcile);
+    const interval = setInterval(handleReconcile, 60000);
+
+    return () => {
+      window.removeEventListener("focus", handleReconcile);
+      document.removeEventListener("visibilitychange", handleReconcile);
+      clearInterval(interval);
+    };
+  }, [reconcileRollover]);
+
   // Compute current leveling progress derived from state
   const levelProgress = useMemo(() => {
     if (!state) return null;
     return calculateLevel(state.progression.totalXp);
+  }, [state]);
+
+  // Compute promotion trial status derived from state
+  const promotionTrial = useMemo(() => {
+    if (!state) return null;
+    const currentRungIdx = findLadderIndex(state.seasonRank.tier, state.seasonRank.division);
+    const nextRung = getRankRung(currentRungIdx + 1);
+    const localDate = toLocalDate(nowUtc(), state.settings.timeZone);
+    return evaluatePromotionTrial(
+      state.seasonRank,
+      nextRung.tier,
+      localDate,
+      state.settings.timeZone
+    );
   }, [state]);
 
   // -------------------------------------------------------------
@@ -183,9 +244,19 @@ export function useAppStore(): UseAppStoreReturn {
     (taskId: string): CompleteTaskResult | null => {
       if (!state) return null;
 
-      const result = completeTask(state, taskId);
+      // Reconcile rollover immediately before finishing task so cross-midnight
+      // completions are never credited to an un-reconciled season
+      const rollover = checkAndApplySeasonRollover(state);
+      const stateToUse = rollover.rolledOver ? rollover.nextState : state;
+
+      const result = completeTask(stateToUse, taskId);
       if (!result.taskCompleted) {
-        // Idempotent no-op
+        // Even if task was not completed, persist rollover if it occurred
+        if (rollover.rolledOver) {
+          const { manager } = getStorageInstances();
+          manager.saveState(stateToUse);
+          setState(stateToUse);
+        }
         return result;
       }
 
@@ -232,9 +303,19 @@ export function useAppStore(): UseAppStoreReturn {
     (habitId: string, customDate?: string): CompleteHabitResult | null => {
       if (!state) return null;
 
-      const result = completeHabit(state, habitId, customDate);
+      // Reconcile rollover immediately before completing habit so cross-midnight
+      // completions are never credited to an un-reconciled season
+      const rollover = checkAndApplySeasonRollover(state);
+      const stateToUse = rollover.rolledOver ? rollover.nextState : state;
+
+      const result = completeHabit(stateToUse, habitId, customDate);
       if (!result.habitCompleted) {
-        // Idempotent same-day no-op
+        // Even if habit was already checked in today, persist rollover if it occurred
+        if (rollover.rolledOver) {
+          const { manager } = getStorageInstances();
+          manager.saveState(stateToUse);
+          setState(stateToUse);
+        }
         return result;
       }
 
@@ -350,6 +431,8 @@ export function useAppStore(): UseAppStoreReturn {
     error,
     metrics,
     levelProgress,
+    promotionTrial,
+    reconcileRollover,
     addTask,
     editTask,
     removeTask,

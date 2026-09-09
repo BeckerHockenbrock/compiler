@@ -4,6 +4,13 @@ import { useState, useId } from "react";
 import { useAppStore } from "@/hooks/use-app-store";
 import type { Task, TaskPriority } from "@/domain/types";
 import { toLocalDate, nowUtc } from "@/domain/date-time";
+import { RankBadge } from "@/components/rank-badge";
+import {
+  formatRankLabel,
+  getDaysRemainingInSeason,
+  findLadderIndex,
+  getRankRung,
+} from "@/domain/season-rank";
 
 type ActiveTab = "home" | "progress" | "health" | "data";
 
@@ -75,19 +82,15 @@ interface RadarChartProps {
   entries: readonly { id: string; name: string; value: number }[];
 }
 
+// Fixed benchmark maximum for the Radar Chart polygon visualization (Level 10 benchmark)
+const RADAR_BENCHMARK_MAX = 100;
+
 function ProgressionRadarChart({ entries }: RadarChartProps) {
   const size = 300;
   const cx = size / 2;
   const cy = size / 2;
   const maxRadius = 90;
   const count = entries.length;
-
-  // Stable scale cap:
-  // Instead of dynamically auto-scaling to the highest single stat (which causes
-  // the polygon to deceptively shrink or remain static when all stats grow uniformly),
-  // we anchor to a stable milestone progression cap (50, stepping to 100, 150, etc. only when exceeded).
-  const highest = Math.max(...entries.map((e) => e.value), 0);
-  const stableMax = Math.max(50, Math.ceil((highest + 1) / 50) * 50);
 
   if (count < 3) {
     return (
@@ -97,15 +100,17 @@ function ProgressionRadarChart({ entries }: RadarChartProps) {
     );
   }
 
-  // Calculate polygon points
+  // Calculate polygon points anchored strictly to RADAR_BENCHMARK_MAX = 100.
+  // Uniform increases across attributes visibly expand the polygon toward the outer boundary.
   const points = entries.map((entry, index) => {
     const angle = -Math.PI / 2 + (2 * Math.PI * index) / count;
-    // Normalized distance: 15% baseline min radius so zero-stat vertices remain visible
-    const ratio = 0.15 + 0.85 * Math.min(1, entry.value / stableMax);
+    // Normalized distance: 15% baseline min radius, clamped strictly to 100% boundary
+    const ratio = 0.15 + 0.85 * Math.min(1, Math.max(0, entry.value / RADAR_BENCHMARK_MAX));
     const r = maxRadius * ratio;
     const x = cx + r * Math.cos(angle);
     const y = cy + r * Math.sin(angle);
-    return { x, y, angle, entry };
+    const isMaxed = entry.value >= RADAR_BENCHMARK_MAX;
+    return { x, y, angle, entry, isMaxed };
   });
 
   const polygonPath = points.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
@@ -220,6 +225,7 @@ export default function HomeDashboard() {
     error,
     metrics,
     levelProgress,
+    promotionTrial,
     addTask,
     editTask,
     removeTask,
@@ -513,6 +519,74 @@ export default function HomeDashboard() {
             </div>
           </section>
 
+          {/* Compact Season Rank Card */}
+          <section className="season-card" aria-label="Season Rank Overview">
+            <div className="season-card-top">
+              <div className="season-badge-col">
+                <RankBadge
+                  tier={state.seasonRank.tier}
+                  division={state.seasonRank.division}
+                  size={52}
+                  glow={true}
+                />
+              </div>
+              <div className="season-header-info">
+                <div className="season-label-row">
+                  <span className="season-number-tag">{state.seasonRank.currentSeasonLabel}</span>
+                  <span className="season-days-left">
+                    {getDaysRemainingInSeason(nowUtc(), state.settings.timeZone)}d left
+                  </span>
+                </div>
+                <div className="season-rank-title-row">
+                  <h3 className="season-rank-title">
+                    {formatRankLabel(state.seasonRank.tier, state.seasonRank.division)}
+                  </h3>
+                  {state.seasonRank.isProvisional ? (
+                    <span className="provisional-pill">
+                      Provisional ({state.seasonRank.provisionalActivitiesCount}/3)
+                    </span>
+                  ) : (
+                    <span className="season-confirmed-pill">Active Standing</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Division SR Progress */}
+            <div className="progress-container" style={{ marginTop: "12px", marginBottom: "12px" }}>
+              <div className="progress-label-row">
+                <span>Division Progress</span>
+                <span style={{ color: "var(--accent-blue-bright)", fontWeight: 600 }}>
+                  {state.seasonRank.sr} / 100 SR
+                </span>
+              </div>
+              <div className="progress-bar-track">
+                <div
+                  className="progress-bar-fill"
+                  style={{ width: `${Math.max(3, Math.min(100, state.seasonRank.sr))}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Weekly Ranked Mission Status */}
+            <div className="season-mission-strip">
+              <div className="season-mission-content">
+                <div className="season-mission-title">
+                  <span>{state.seasonRank.weeklyMission.title}</span>
+                  <span className="reward-chip">+{state.seasonRank.weeklyMission.srReward} SR</span>
+                </div>
+                <div className="season-mission-desc">
+                  {state.seasonRank.weeklyMission.description}
+                </div>
+              </div>
+              <span className={`mission-status-chip ${state.seasonRank.weeklyMission.completed ? "completed" : ""}`}>
+                {state.seasonRank.weeklyMission.completed
+                  ? "Completed"
+                  : `${state.seasonRank.weeklyMission.currentCount} / ${state.seasonRank.weeklyMission.targetCount}`}
+              </span>
+            </div>
+          </section>
+
           {/* Daily Habits Section */}
           <section style={{ marginBottom: "24px" }}>
             <div className="section-header">
@@ -799,6 +873,186 @@ export default function HomeDashboard() {
       {/* ------------------------------------------------------------ */}
       {activeTab === "progress" && (
         <>
+          {/* Permanent Progression Guarantee Notice */}
+          <div
+            className="status-banner status-normal"
+            style={{ marginBottom: "16px", marginTop: "0", textAlign: "left" }}
+          >
+            <span style={{ fontSize: "0.76rem", lineHeight: "1.4" }}>
+              <strong>Permanent Progression Guarantee:</strong> Lifetime XP, character level, skill points, habits, and stats never reset. Season Rank resets on the 1st of each month to measure monthly consistency.
+            </span>
+          </div>
+
+          {/* Full Season Rank Progression Card */}
+          <section className="season-hero-card" aria-label="Monthly Season Rank Details">
+            <div className="season-hero-header">
+              <div className="season-hero-badge-wrap">
+                <RankBadge
+                  tier={state.seasonRank.tier}
+                  division={state.seasonRank.division}
+                  size={84}
+                  glow={true}
+                />
+              </div>
+
+              <div className="season-hero-meta">
+                <div className="season-label-row">
+                  <span className="season-number-tag">{state.seasonRank.currentSeasonLabel}</span>
+                  <span className="season-days-left">
+                    {getDaysRemainingInSeason(nowUtc(), state.settings.timeZone)} days remaining
+                  </span>
+                </div>
+
+                <h2 className="season-hero-rank-title">
+                  {formatRankLabel(state.seasonRank.tier, state.seasonRank.division)}
+                </h2>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginTop: "4px" }}>
+                  {state.seasonRank.isProvisional ? (
+                    <span className="provisional-pill">
+                      Provisional ({state.seasonRank.provisionalActivitiesCount}/3)
+                    </span>
+                  ) : (
+                    <span className="season-confirmed-pill">Confirmed Rank</span>
+                  )}
+                  <span className="season-peak-chip">
+                    Peak: {formatRankLabel(state.seasonRank.seasonalPeakTier, state.seasonRank.seasonalPeakDivision)}
+                  </span>
+                  {state.seasonRank.allTimePeakTier && (
+                    <span className="season-peak-chip" style={{ color: "var(--accent-blue-bright)" }}>
+                      All-Time: {formatRankLabel(state.seasonRank.allTimePeakTier, state.seasonRank.allTimePeakDivision)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Division SR Progress */}
+            <div className="progress-container" style={{ marginTop: "16px", marginBottom: "8px" }}>
+              <div className="progress-label-row">
+                <span>
+                  {state.seasonRank.tier === "apex" ? "Apex Pinnacle" : "Division Progress"}
+                </span>
+                <span style={{ color: "var(--accent-blue-bright)", fontWeight: 700 }}>
+                  {state.seasonRank.sr} / 100 SR
+                </span>
+              </div>
+              <div className="progress-bar-track">
+                <div
+                  className="progress-bar-fill"
+                  style={{ width: `${Math.max(3, Math.min(100, state.seasonRank.sr))}%` }}
+                />
+              </div>
+              <div className="progress-meta-row">
+                <span>Daily Caps: Task {state.seasonRank.dailyCaps.taskSrEarned}/25 · Habit {state.seasonRank.dailyCaps.habitSrEarned}/10</span>
+                <span>{state.seasonRank.tier === "apex" ? "Apex Reached" : `Next: ${formatRankLabel(getRankRung(findLadderIndex(state.seasonRank.tier, state.seasonRank.division) + 1).tier, getRankRung(findLadderIndex(state.seasonRank.tier, state.seasonRank.division) + 1).division)}`}</span>
+              </div>
+            </div>
+
+            {/* Promotion Trial Checklist (Hidden for Apex since Apex is maximum rank) */}
+            {state.seasonRank.tier === "apex" ? (
+              <div className="promotion-trial-card" style={{ borderColor: "rgba(255, 255, 255, 0.25)" }}>
+                <div className="trial-header">
+                  <h3 className="trial-title">Pinnacle Rank Achieved</h3>
+                  <span className="trial-badge status-ready">Apex Pinnacle</span>
+                </div>
+                <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", margin: 0, lineHeight: 1.5 }}>
+                  You hold the highest rank on the ladder for {state.seasonRank.currentSeasonLabel}. Maintain your weekly consistency and complete weekly missions until the season rollover.
+                </p>
+              </div>
+            ) : (
+              <div className="promotion-trial-card">
+                <div className="trial-header">
+                  <h3 className="trial-title">Promotion Trial Requirements</h3>
+                  <span className={`trial-badge ${promotionTrial?.allMet ? "status-ready" : "status-pending"}`}>
+                    {promotionTrial?.allMet ? "Eligible" : "In Progress"}
+                  </span>
+                </div>
+
+                {state.seasonRank.isProvisional && (
+                  <div className="provisional-warning-callout">
+                    Promotion is gated during provisional placement. Complete 3 qualifying activities in this season ({state.seasonRank.provisionalActivitiesCount}/3) to unlock promotions.
+                  </div>
+                )}
+
+                <div className="trial-checklist">
+                  <div className={`trial-item ${state.seasonRank.sr >= 100 ? "item-met" : "item-unmet"}`}>
+                    <span className="trial-check-icon">{state.seasonRank.sr >= 100 ? "✓" : "○"}</span>
+                    <div className="trial-item-info">
+                      <span className="trial-item-label">100 Season Rank Points (SR)</span>
+                      <span className="trial-item-sub">Current: {state.seasonRank.sr} / 100 SR</span>
+                    </div>
+                  </div>
+
+                  <div className={`trial-item ${(promotionTrial?.qualifyingSessionsCount ?? 0) >= 3 ? "item-met" : "item-unmet"}`}>
+                    <span className="trial-check-icon">{(promotionTrial?.qualifyingSessionsCount ?? 0) >= 3 ? "✓" : "○"}</span>
+                    <div className="trial-item-info">
+                      <span className="trial-item-label">3 Qualifying Productivity Sessions (Last 7 Days)</span>
+                      <span className="trial-item-sub">Completed: {promotionTrial?.qualifyingSessionsCount ?? 0} / 3 sessions</span>
+                    </div>
+                  </div>
+
+                  <div className={`trial-item ${(promotionTrial?.activeDaysCount ?? 0) >= (promotionTrial?.activeDaysTarget ?? 4) ? "item-met" : "item-unmet"}`}>
+                    <span className="trial-check-icon">{(promotionTrial?.activeDaysCount ?? 0) >= (promotionTrial?.activeDaysTarget ?? 4) ? "✓" : "○"}</span>
+                    <div className="trial-item-info">
+                      <span className="trial-item-label">{promotionTrial?.activeDaysTarget ?? 4} Active Days (Last 7 Days)</span>
+                      <span className="trial-item-sub">Active Days: {promotionTrial?.activeDaysCount ?? 0} / {promotionTrial?.activeDaysTarget ?? 4} days</span>
+                    </div>
+                  </div>
+
+                  <div className={`trial-item ${state.seasonRank.weeklyMission.completed ? "item-met" : "item-unmet"}`}>
+                    <span className="trial-check-icon">{state.seasonRank.weeklyMission.completed ? "✓" : "○"}</span>
+                    <div className="trial-item-info">
+                      <span className="trial-item-label">One Completed Weekly Ranked Mission</span>
+                      <span className="trial-item-sub">
+                        {state.seasonRank.weeklyMission.completed
+                          ? "Completed (+25 SR credited)"
+                          : `Progress: ${state.seasonRank.weeklyMission.currentCount} / ${state.seasonRank.weeklyMission.targetCount} qualifying activities`}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Previous Season Summary */}
+            <div className="previous-season-row">
+              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Previous Season Final:</span>
+              <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--text-main)" }}>
+                {state.seasonRank.previousSeasonSummary
+                  ? `${state.seasonRank.previousSeasonSummary.label}: ${formatRankLabel(state.seasonRank.previousSeasonSummary.finalTier, state.seasonRank.previousSeasonSummary.finalDivision)} (${state.seasonRank.previousSeasonSummary.finalSr} SR)`
+                  : "First active season in progress"}
+              </span>
+            </div>
+
+            {/* Season History Records */}
+            {state.seasonRank.history.length > 0 && (
+              <div className="season-history-section">
+                <h4 className="season-history-title">Archived Season History</h4>
+                <div className="season-history-list">
+                  {state.seasonRank.history.map((record) => (
+                    <div key={record.seasonId} className="season-history-item">
+                      <div className="season-history-item-left">
+                        <RankBadge tier={record.finalTier} division={record.finalDivision} size={28} showDivision={false} />
+                        <div>
+                          <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text-main)" }}>
+                            {record.label}
+                          </div>
+                          <div style={{ fontSize: "0.7rem", color: "var(--text-dim)" }}>
+                            Final: {formatRankLabel(record.finalTier, record.finalDivision)} ({record.finalSr} SR) · Peak: {formatRankLabel(record.peakTier, record.peakDivision)}
+                          </div>
+                        </div>
+                      </div>
+                      <span className="season-history-tag">
+                        {record.completedAt.slice(0, 10)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+
           {/* Skill points alert banner */}
           {state.progression.availableSkillPoints > 0 && (
             <div
@@ -813,13 +1067,13 @@ export default function HomeDashboard() {
           <section className="radar-card">
             <div style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
               <h2 className="section-title" style={{ margin: 0 }}>Progression Polygon</h2>
-              <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>Level {levelProgress.level} · Milestone Cap {Math.max(50, Math.ceil((Math.max(...statEntries.map((e) => e.value), 0) + 1) / 50) * 50)} pts</span>
+              <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>Level {levelProgress.level} · Milestone Benchmark: 100 pts</span>
             </div>
 
             <ProgressionRadarChart entries={statEntries} />
 
             <p style={{ fontSize: "0.72rem", color: "var(--text-dim)", textAlign: "center", marginTop: "8px", maxWidth: "280px", lineHeight: "1.4" }}>
-              Visualizes holistic balance across attributes against a stable milestone cap. Completing tasks and ranking up skills expands the polygon.
+              Visualizes holistic balance across attributes against a fixed 100-point benchmark. Completing tasks and ranking up skills visibly expands the polygon toward mastery.
             </p>
           </section>
 
@@ -906,7 +1160,7 @@ export default function HomeDashboard() {
             </div>
 
             <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", lineHeight: "1.5", marginTop: "10px" }}>
-              Connect your WHOOP strap in future releases to synchronize daily recovery, sleep efficiency, and cardiovascular strain. Rest and physical recovery will reward progression points alongside study and focus tasks.
+              Connect your WHOOP strap in future releases to view daily recovery, sleep efficiency, and cardiovascular strain. Physiological wearable data provides personal readiness context and suggested missions only; health metrics never affect Season Rank, award or deduct XP/SR, or penalize your standing.
             </p>
 
             {/* Empty-State Wearable Metrics Preview */}
@@ -943,7 +1197,7 @@ export default function HomeDashboard() {
           {/* Provider Architecture Guarantee Card */}
           <section className="task-card" style={{ flexDirection: "column", gap: "10px", alignItems: "stretch" }}>
             <h3 style={{ fontSize: "0.88rem", fontWeight: 600, color: "var(--text-main)" }}>
-              🔒 Zero Client Credential Transmission
+              Zero Client Credential Transmission
             </h3>
             <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: "1.45" }}>
               This web application operates strictly as a static, local-first client. WHOOP OAuth tokens, client secrets, and physiological data are never stored in plain browser storage or transmitted without explicit secure backend mediation.

@@ -1,8 +1,8 @@
 /**
  * Migration Engine & Version Transition Registry
  *
- * Current schema version is 1.
- * Migration step files are registered only when an actual version transition (e.g. 1 -> 2)
+ * Current schema version is 2.
+ * Migration step files are registered when an actual version transition (e.g. 1 -> 2)
  * is created. This file coordinates the sequential execution of those transitions in memory.
  */
 
@@ -13,6 +13,7 @@ import {
   StorageEnvelopeSchema,
 } from "@/storage/schema";
 import type { StorageEnvelope, StorageError } from "@/storage/types";
+import { migrateV1ToV2 } from "./v1-to-v2";
 
 export type MigrationStep = (
   previousState: unknown
@@ -20,7 +21,6 @@ export type MigrationStep = (
 
 /**
  * Registry of version migrations: maps version V -> function that upgrades from V to V+1.
- * Currently empty because CURRENT_SCHEMA_VERSION = 1 has no previous versions.
  */
 const migrationRegistry: Map<number, MigrationStep> = new Map();
 
@@ -33,6 +33,9 @@ export function registerMigration(
 ): void {
   migrationRegistry.set(fromVersion, step);
 }
+
+// Built-in migrations
+registerMigration(1, migrateV1ToV2);
 
 /**
  * Runs sequential migrations in memory if the payload is from an older schema version.

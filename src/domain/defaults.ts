@@ -4,6 +4,7 @@
 
 import type { AppState, StatDefinition, Skill, Task, Habit } from "./types";
 import { nowUtc } from "./date-time";
+import { createInitialSeasonRankState } from "./season-rank";
 
 export const DEFAULT_STAT_DEFINITIONS: readonly StatDefinition[] = [
   {
@@ -110,9 +111,25 @@ export function createInitialAppState(): AppState {
     habits: initialHabits,
     activityLogs: [],
     settings: {
-      timeZone: "UTC",
+      timeZone: (() => {
+        try {
+          return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+        } catch {
+          return "UTC";
+        }
+      })(),
       dailyResetHour: 0,
       maxLogRetention: 500,
     },
+    seasonRank: createInitialSeasonRankState(
+      timestamp,
+      (() => {
+        try {
+          return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+        } catch {
+          return "UTC";
+        }
+      })()
+    ),
   };
 }
