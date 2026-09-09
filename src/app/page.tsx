@@ -5,21 +5,52 @@ import { useAppStore } from "@/hooks/use-app-store";
 import type { Task, TaskPriority } from "@/domain/types";
 import { toLocalDate, nowUtc } from "@/domain/date-time";
 
-type ActiveTab = "tasks" | "progress" | "data";
+type ActiveTab = "home" | "progress" | "health" | "data";
+
+/* ------------------------------------------------------------------ */
+/* Accessible Inline Navigation & Action SVGs                         */
+/* ------------------------------------------------------------------ */
+
+function HomeIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <polyline points="9 22 9 12 15 12 15 22" />
+    </svg>
+  );
+}
+
+function ProgressIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2" />
+      <line x1="12" y1="22" x2="12" y2="15.5" />
+      <polyline points="22 8.5 12 15.5 2 8.5" />
+    </svg>
+  );
+}
+
+function HealthIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+    </svg>
+  );
+}
+
+function DataIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <ellipse cx="12" cy="5" rx="9" ry="3" />
+      <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+      <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+    </svg>
+  );
+}
 
 function EditIcon() {
   return (
-    <svg
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
       <path d="m15 5 4 4" />
     </svg>
@@ -28,23 +59,159 @@ function EditIcon() {
 
 function DeleteIcon() {
   return (
-    <svg
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M3 6h18" />
       <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
       <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
     </svg>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* SVG Radar / Polygon Chart Component                                */
+/* ------------------------------------------------------------------ */
+
+interface RadarChartProps {
+  entries: readonly { id: string; name: string; value: number }[];
+}
+
+function ProgressionRadarChart({ entries }: RadarChartProps) {
+  const size = 300;
+  const cx = size / 2;
+  const cy = size / 2;
+  const maxRadius = 90;
+  const count = entries.length;
+
+  // Stable scale cap:
+  // Instead of dynamically auto-scaling to the highest single stat (which causes
+  // the polygon to deceptively shrink or remain static when all stats grow uniformly),
+  // we anchor to a stable milestone progression cap (50, stepping to 100, 150, etc. only when exceeded).
+  const highest = Math.max(...entries.map((e) => e.value), 0);
+  const stableMax = Math.max(50, Math.ceil((highest + 1) / 50) * 50);
+
+  if (count < 3) {
+    return (
+      <div style={{ color: "var(--text-dim)", fontSize: "0.85rem", padding: "24px" }}>
+        Need at least 3 attributes to display progression polygon.
+      </div>
+    );
+  }
+
+  // Calculate polygon points
+  const points = entries.map((entry, index) => {
+    const angle = -Math.PI / 2 + (2 * Math.PI * index) / count;
+    // Normalized distance: 15% baseline min radius so zero-stat vertices remain visible
+    const ratio = 0.15 + 0.85 * Math.min(1, entry.value / stableMax);
+    const r = maxRadius * ratio;
+    const x = cx + r * Math.cos(angle);
+    const y = cy + r * Math.sin(angle);
+    return { x, y, angle, entry };
+  });
+
+  const polygonPath = points.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+
+  // Grid level rings at 25%, 50%, 75%, 100%
+  const gridLevels = [0.25, 0.5, 0.75, 1.0];
+
+  return (
+    <div className="radar-svg-container" role="img" aria-label="Core attributes progression radar chart">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <title>Core Attributes Progression Radar</title>
+        <desc>
+          {entries.map((e) => `${e.name}: ${e.value}`).join(", ")}
+        </desc>
+
+        {/* Concentric Grid Rings */}
+        {gridLevels.map((level) => {
+          const ringPoints = entries
+            .map((_, i) => {
+              const angle = -Math.PI / 2 + (2 * Math.PI * i) / count;
+              const r = maxRadius * level;
+              return `${(cx + r * Math.cos(angle)).toFixed(1)},${(cy + r * Math.sin(angle)).toFixed(1)}`;
+            })
+            .join(" ");
+
+          return (
+            <polygon
+              key={`ring-${level}`}
+              points={ringPoints}
+              fill="none"
+              stroke="rgba(255, 255, 255, 0.08)"
+              strokeWidth={level === 1.0 ? 1.5 : 1}
+              strokeDasharray={level < 1.0 ? "2,3" : undefined}
+            />
+          );
+        })}
+
+        {/* Radial Spoke Lines */}
+        {entries.map((_, i) => {
+          const angle = -Math.PI / 2 + (2 * Math.PI * i) / count;
+          const outerX = cx + maxRadius * Math.cos(angle);
+          const outerY = cy + maxRadius * Math.sin(angle);
+          return (
+            <line
+              key={`spoke-${i}`}
+              x1={cx}
+              y1={cy}
+              x2={outerX}
+              y2={outerY}
+              stroke="rgba(255, 255, 255, 0.10)"
+              strokeWidth="1"
+            />
+          );
+        })}
+
+        {/* Shaded Data Polygon */}
+        <polygon
+          points={polygonPath}
+          fill="rgba(0, 144, 255, 0.22)"
+          stroke="#0090ff"
+          strokeWidth="2"
+          strokeLinejoin="round"
+          style={{ filter: "drop-shadow(0 0 8px rgba(0, 144, 255, 0.4))" }}
+        />
+
+        {/* Vertex Data Dots & Axis Labels */}
+        {points.map(({ x, y, angle, entry }, i) => {
+          const labelDist = maxRadius + 24;
+          const lx = cx + labelDist * Math.cos(angle);
+          const ly = cy + labelDist * Math.sin(angle) + 4;
+
+          return (
+            <g key={`vertex-${i}`}>
+              <circle cx={x} cy={y} r="3.5" fill="#ffffff" stroke="#0090ff" strokeWidth="2" />
+              <text
+                x={lx}
+                y={ly}
+                textAnchor="middle"
+                fontSize="10"
+                fontWeight="600"
+                letterSpacing="0.04em"
+                fill="var(--text-muted)"
+              >
+                {entry.name}
+              </text>
+              <text
+                x={lx}
+                y={ly + 11}
+                textAnchor="middle"
+                fontSize="9"
+                fontWeight="700"
+                fill="var(--accent-blue-bright)"
+              >
+                +{entry.value}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Main Application Dashboard                                         */
+/* ------------------------------------------------------------------ */
 
 export default function HomeDashboard() {
   const {
@@ -66,7 +233,7 @@ export default function HomeDashboard() {
     resetDefaults,
   } = useAppStore();
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>("tasks");
+  const [activeTab, setActiveTab] = useState<ActiveTab>("home");
 
   // Task creation state
   const [taskTitle, setTaskTitle] = useState("");
@@ -91,6 +258,7 @@ export default function HomeDashboard() {
   const [habitToDelete, setHabitToDelete] = useState<string | null>(null);
   const [pendingImportFile, setPendingImportFile] = useState<string | null>(null);
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
+  const [whoopModalOpen, setWhoopModalOpen] = useState(false);
 
   // Status message
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -243,8 +411,8 @@ export default function HomeDashboard() {
     return (
       <main className="app-viewport" style={{ justifyContent: "center" }}>
         <h1 className="sr-only">Personal Focus & Progression Dashboard</h1>
-        <div className="overview-card" style={{ textAlign: "center" }}>
-          <h2 style={{ color: "var(--text-main)", marginBottom: "8px", fontSize: "1.1rem" }}>
+        <div className="hero-card" style={{ textAlign: "center" }}>
+          <h2 style={{ color: "var(--status-danger-text)", marginBottom: "8px", fontSize: "1.1rem" }}>
             Storage Unavailable
           </h2>
           <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", lineHeight: "1.5" }}>
@@ -263,96 +431,17 @@ export default function HomeDashboard() {
   const completedTasks = state.tasks.filter((t) => t.status === "completed");
   const habitsDoneToday = state.habits.filter((h) => h.lastCompletedDate === todayDate);
 
+  const statEntries = state.statDefinitions.map((def) => {
+    const val = state.stats[def.id]?.current ?? 0;
+    return { id: def.id, name: def.name, value: val };
+  });
+
   return (
     <main className="app-viewport">
       {/* Visually hidden primary heading for accessible document outline */}
       <h1 className="sr-only">Personal Focus & Progression Dashboard</h1>
 
-      {/* ------------------------------------------------------------ */}
-      {/* Overview & Progression Summary                               */}
-      {/* ------------------------------------------------------------ */}
-      <section className="overview-card" aria-label="Progression Overview">
-        <div className="overview-top-bar">
-          <div className="profile-badge">
-            <span>Level {levelProgress.level}</span>
-            <span className="profile-badge-sub">· Focus Progression</span>
-          </div>
-          {state.progression.availableSkillPoints > 0 ? (
-            <span className="points-pill">
-              {state.progression.availableSkillPoints} Skill Points Available
-            </span>
-          ) : (
-            <span style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>
-              {todayDate}
-            </span>
-          )}
-        </div>
-
-        {/* Level Progress Gauge */}
-        <div className="progress-container">
-          <div className="progress-label-row">
-            <span>Level Progress</span>
-            <span>
-              {levelProgress.currentLevelXp} / {levelProgress.requiredLevelXp} XP ({Math.round(levelProgress.progressRatio * 100)}%)
-            </span>
-          </div>
-          <div className="progress-bar-track">
-            <div
-              className="progress-bar-fill"
-              style={{ width: `${Math.max(3, Math.min(100, levelProgress.progressRatio * 100))}%` }}
-            />
-          </div>
-          <div className="progress-meta-row">
-            <span>Total XP: {state.progression.totalXp}</span>
-            <span>Next Level: {levelProgress.nextLevelXp} XP</span>
-          </div>
-        </div>
-
-        {/* Time-Centered Focus Metrics Grid */}
-        <div className="focus-metrics-grid">
-          <div className="focus-metric-item">
-            <span className="focus-metric-label">Active Tasks</span>
-            <span className="focus-metric-val">{pendingTasks.length}</span>
-          </div>
-          <div className="focus-metric-item">
-            <span className="focus-metric-label">Daily Habits</span>
-            <span className="focus-metric-val">{habitsDoneToday.length} / {state.habits.length}</span>
-          </div>
-          <div className="focus-metric-item">
-            <span className="focus-metric-label">Focus Session</span>
-            <span className="focus-metric-val" style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Ready</span>
-          </div>
-        </div>
-      </section>
-
-      {/* ------------------------------------------------------------ */}
-      {/* Navigation Tabs (Restrained, Monochrome)                     */}
-      {/* ------------------------------------------------------------ */}
-      <nav className="nav-tabs" aria-label="Main Navigation">
-        <button
-          type="button"
-          className={`nav-tab-btn ${activeTab === "tasks" ? "active" : ""}`}
-          onClick={() => setActiveTab("tasks")}
-        >
-          Tasks
-        </button>
-        <button
-          type="button"
-          className={`nav-tab-btn ${activeTab === "progress" ? "active" : ""}`}
-          onClick={() => setActiveTab("progress")}
-        >
-          Progress
-        </button>
-        <button
-          type="button"
-          className={`nav-tab-btn ${activeTab === "data" ? "active" : ""}`}
-          onClick={() => setActiveTab("data")}
-        >
-          Data
-        </button>
-      </nav>
-
-      {/* Feedback banner */}
+      {/* Temporary Feedback Banner */}
       {feedbackMsg && (
         <div
           className={`status-banner ${feedbackMsg.type === "success" ? "status-success" : "status-error"}`}
@@ -365,11 +454,66 @@ export default function HomeDashboard() {
       )}
 
       {/* ------------------------------------------------------------ */}
-      {/* TAB 1: TASKS & DAILY PRACTICES                               */}
+      {/* DESTINATION 1: HOME (Dashboard, Tasks, Habits, Progression)  */}
       {/* ------------------------------------------------------------ */}
-      {activeTab === "tasks" && (
+      {activeTab === "home" && (
         <>
-          {/* Daily Habits */}
+          {/* Hero Progression Card */}
+          <section className="hero-card" aria-label="Progression Overview">
+            <div className="hero-top-bar">
+              <div className="level-badge">
+                <span>Level {levelProgress.level}</span>
+                <span className="level-badge-tag">Tier {Math.floor((levelProgress.level - 1) / 5) + 1}</span>
+              </div>
+              {state.progression.availableSkillPoints > 0 ? (
+                <span className="points-pill">
+                  {state.progression.availableSkillPoints} Skill Points Available
+                </span>
+              ) : (
+                <span style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>
+                  {todayDate}
+                </span>
+              )}
+            </div>
+
+            {/* Level Progress Gauge */}
+            <div className="progress-container">
+              <div className="progress-label-row">
+                <span>Level Progress</span>
+                <span style={{ color: "var(--accent-blue-bright)", fontWeight: 600 }}>
+                  {levelProgress.currentLevelXp} / {levelProgress.requiredLevelXp} XP ({Math.round(levelProgress.progressRatio * 100)}%)
+                </span>
+              </div>
+              <div className="progress-bar-track">
+                <div
+                  className="progress-bar-fill"
+                  style={{ width: `${Math.max(3, Math.min(100, levelProgress.progressRatio * 100))}%` }}
+                />
+              </div>
+              <div className="progress-meta-row">
+                <span>Total XP: {state.progression.totalXp}</span>
+                <span>Next Level: {levelProgress.nextLevelXp} XP</span>
+              </div>
+            </div>
+
+            {/* Time-Centered Focus Metrics Grid */}
+            <div className="focus-metrics-grid">
+              <div className="focus-metric-item">
+                <span className="focus-metric-label">Active Tasks</span>
+                <span className="focus-metric-val">{pendingTasks.length}</span>
+              </div>
+              <div className="focus-metric-item">
+                <span className="focus-metric-label">Daily Habits</span>
+                <span className="focus-metric-val">{habitsDoneToday.length} / {state.habits.length}</span>
+              </div>
+              <div className="focus-metric-item">
+                <span className="focus-metric-label">Focus Session</span>
+                <span className="focus-metric-val" style={{ fontSize: "0.85rem", color: "var(--accent-blue-bright)" }}>Ready</span>
+              </div>
+            </div>
+          </section>
+
+          {/* Daily Habits Section */}
           <section style={{ marginBottom: "24px" }}>
             <div className="section-header">
               <h2 className="section-title">Daily Habits ({state.habits.length})</h2>
@@ -435,7 +579,7 @@ export default function HomeDashboard() {
                         <div className="task-title">{habit.title}</div>
                         <div className="task-meta">
                           <span className="habit-streak-badge">
-                            {habit.streakCurrent} {habit.streakCurrent === 1 ? "day streak" : "day streak"}
+                            🔥 {habit.streakCurrent} {habit.streakCurrent === 1 ? "day streak" : "day streak"}
                           </span>
                           <span className="reward-chip">+{habit.xpReward} XP</span>
                           {habit.streakBest > 0 && (
@@ -472,7 +616,7 @@ export default function HomeDashboard() {
             )}
           </section>
 
-          {/* Task Creation Form */}
+          {/* New Task Creation Form */}
           <section>
             <div className="section-header">
               <h2 className="section-title">New Task</h2>
@@ -546,7 +690,7 @@ export default function HomeDashboard() {
             </form>
           </section>
 
-          {/* Pending Tasks Section */}
+          {/* Active Tasks List */}
           <section>
             <div className="section-header">
               <h2 className="section-title">Active Tasks ({pendingTasks.length})</h2>
@@ -610,7 +754,7 @@ export default function HomeDashboard() {
             )}
           </section>
 
-          {/* Completed Tasks Section */}
+          {/* Completed Tasks Archive */}
           {completedTasks.length > 0 && (
             <section style={{ marginTop: "24px" }}>
               <div className="section-header">
@@ -651,7 +795,7 @@ export default function HomeDashboard() {
       )}
 
       {/* ------------------------------------------------------------ */}
-      {/* TAB 2: PROGRESS & ATTRIBUTES                                 */}
+      {/* DESTINATION 2: PROGRESS (Radar Chart, Attributes, Skills)    */}
       {/* ------------------------------------------------------------ */}
       {activeTab === "progress" && (
         <>
@@ -664,6 +808,45 @@ export default function HomeDashboard() {
               <strong>{state.progression.availableSkillPoints} Skill Point(s) Available.</strong> Allocate points to advance focus skills and increase core attributes.
             </div>
           )}
+
+          {/* Hex / Radar Progression Visualizer */}
+          <section className="radar-card">
+            <div style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+              <h2 className="section-title" style={{ margin: 0 }}>Progression Polygon</h2>
+              <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>Level {levelProgress.level} · Milestone Cap {Math.max(50, Math.ceil((Math.max(...statEntries.map((e) => e.value), 0) + 1) / 50) * 50)} pts</span>
+            </div>
+
+            <ProgressionRadarChart entries={statEntries} />
+
+            <p style={{ fontSize: "0.72rem", color: "var(--text-dim)", textAlign: "center", marginTop: "8px", maxWidth: "280px", lineHeight: "1.4" }}>
+              Visualizes holistic balance across attributes against a stable milestone cap. Completing tasks and ranking up skills expands the polygon.
+            </p>
+          </section>
+
+          {/* Color-Accented Core Attributes Grid */}
+          <section>
+            <div className="section-header">
+              <h2 className="section-title">Core Attributes ({state.statDefinitions.length})</h2>
+            </div>
+
+            <div className="attrs-grid">
+              {state.statDefinitions.map((def) => {
+                const statVal = state.stats[def.id] ?? { current: 0, lifetimeEarned: 0 };
+                return (
+                  <div key={def.id} className={`attr-card attr-${def.id}`}>
+                    <div className="attr-header">
+                      <span className="attr-name">{def.name}</span>
+                      <span className="attr-val">+{statVal.current}</span>
+                    </div>
+                    <p className="attr-desc">{def.description}</p>
+                    <div style={{ fontSize: "0.68rem", color: "var(--text-dim)", marginTop: "6px" }}>
+                      Lifetime: +{statVal.lifetimeEarned} pts
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
 
           {/* Skills Section */}
           <section style={{ marginBottom: "24px" }}>
@@ -703,40 +886,74 @@ export default function HomeDashboard() {
               ))}
             </div>
           </section>
+        </>
+      )}
 
-          {/* Core Attributes Breakdown */}
-          <section>
-            <div className="section-header">
-              <h2 className="section-title">Core Attributes</h2>
+      {/* ------------------------------------------------------------ */}
+      {/* DESTINATION 3: HEALTH (Future WHOOP Wearable Dashboard)       */}
+      {/* ------------------------------------------------------------ */}
+      {activeTab === "health" && (
+        <>
+          <section className="health-hero-card">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+              <div>
+                <h2 style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--text-main)" }}>Wearable Integration</h2>
+                <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "2px" }}>
+                  Physiological recovery, sleep, and strain tracking
+                </p>
+              </div>
+              <span className="health-status-badge">Not Connected</span>
             </div>
 
-            <div className="task-list">
-              {state.statDefinitions.map((def) => {
-                const statVal = state.stats[def.id] ?? { current: 0, lifetimeEarned: 0 };
-                return (
-                  <div key={def.id} className="task-card">
-                    <div className="task-info">
-                      <div className="task-title" style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span>{def.name}</span>
-                        <span style={{ fontWeight: 600, color: "var(--text-main)" }}>+{statVal.current}</span>
-                      </div>
-                      <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: "2px" }}>
-                        {def.description}
-                      </p>
-                      <div style={{ fontSize: "0.68rem", color: "var(--text-dim)", marginTop: "4px" }}>
-                        Lifetime: +{statVal.lifetimeEarned} pts
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+            <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", lineHeight: "1.5", marginTop: "10px" }}>
+              Connect your WHOOP strap in future releases to synchronize daily recovery, sleep efficiency, and cardiovascular strain. Rest and physical recovery will reward progression points alongside study and focus tasks.
+            </p>
+
+            {/* Empty-State Wearable Metrics Preview */}
+            <div className="health-metrics-grid">
+              <div className="health-metric-box">
+                <span className="health-metric-label">Recovery</span>
+                <span className="health-metric-val">--%</span>
+                <span className="health-metric-sub">Awaiting device</span>
+              </div>
+              <div className="health-metric-box">
+                <span className="health-metric-label">Sleep Score</span>
+                <span className="health-metric-val">--%</span>
+                <span className="health-metric-sub">Awaiting device</span>
+              </div>
+              <div className="health-metric-box">
+                <span className="health-metric-label">Day Strain</span>
+                <span className="health-metric-val">0.0</span>
+                <span className="health-metric-sub">Awaiting device</span>
+              </div>
             </div>
+
+            <div style={{ marginTop: "18px" }}>
+              <button
+                type="button"
+                className="btn-primary"
+                style={{ width: "100%" }}
+                onClick={() => setWhoopModalOpen(true)}
+              >
+                Connect WHOOP
+              </button>
+            </div>
+          </section>
+
+          {/* Provider Architecture Guarantee Card */}
+          <section className="task-card" style={{ flexDirection: "column", gap: "10px", alignItems: "stretch" }}>
+            <h3 style={{ fontSize: "0.88rem", fontWeight: 600, color: "var(--text-main)" }}>
+              🔒 Zero Client Credential Transmission
+            </h3>
+            <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", lineHeight: "1.45" }}>
+              This web application operates strictly as a static, local-first client. WHOOP OAuth tokens, client secrets, and physiological data are never stored in plain browser storage or transmitted without explicit secure backend mediation.
+            </p>
           </section>
         </>
       )}
 
       {/* ------------------------------------------------------------ */}
-      {/* TAB 3: DATA & BACKUP                                         */}
+      {/* DESTINATION 4: DATA (Backup, Restore, Storage Metrics)       */}
       {/* ------------------------------------------------------------ */}
       {activeTab === "data" && (
         <>
@@ -744,7 +961,7 @@ export default function HomeDashboard() {
           <section className="meter-card">
             <div className="meter-header">
               <span>LOCAL BROWSER STORAGE</span>
-              <span>
+              <span style={{ color: "var(--accent-blue-bright)", fontWeight: 600 }}>
                 {metrics ? `${metrics.formattedSize} / 5 MB` : "Checking..."}
               </span>
             </div>
@@ -807,7 +1024,7 @@ export default function HomeDashboard() {
             {/* Storage Reset */}
             <div className="task-card" style={{ flexDirection: "column", gap: "12px", alignItems: "stretch", marginTop: "12px" }}>
               <div>
-                <h3 style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--text-main)" }}>Reset Workspace</h3>
+                <h3 style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--status-danger-text)" }}>Reset Workspace</h3>
                 <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "2px" }}>
                   Reset application data back to initial defaults. All local state will be restored to initial values.
                 </p>
@@ -825,8 +1042,82 @@ export default function HomeDashboard() {
       )}
 
       {/* ------------------------------------------------------------ */}
+      {/* FLOATING LIQUID GLASS BOTTOM NAVIGATION BAR                  */}
+      {/* ------------------------------------------------------------ */}
+      <nav className="liquid-glass-nav" aria-label="Primary Navigation">
+        <button
+          type="button"
+          className={`nav-item ${activeTab === "home" ? "active" : ""}`}
+          onClick={() => setActiveTab("home")}
+          aria-current={activeTab === "home" ? "page" : undefined}
+          aria-label="Home"
+        >
+          <HomeIcon />
+          <span className="nav-label">Home</span>
+        </button>
+
+        <button
+          type="button"
+          className={`nav-item ${activeTab === "progress" ? "active" : ""}`}
+          onClick={() => setActiveTab("progress")}
+          aria-current={activeTab === "progress" ? "page" : undefined}
+          aria-label="Progress"
+        >
+          <ProgressIcon />
+          <span className="nav-label">Progress</span>
+        </button>
+
+        <button
+          type="button"
+          className={`nav-item ${activeTab === "health" ? "active" : ""}`}
+          onClick={() => setActiveTab("health")}
+          aria-current={activeTab === "health" ? "page" : undefined}
+          aria-label="Health"
+        >
+          <HealthIcon />
+          <span className="nav-label">Health</span>
+        </button>
+
+        <button
+          type="button"
+          className={`nav-item ${activeTab === "data" ? "active" : ""}`}
+          onClick={() => setActiveTab("data")}
+          aria-current={activeTab === "data" ? "page" : undefined}
+          aria-label="Data"
+        >
+          <DataIcon />
+          <span className="nav-label">Data</span>
+        </button>
+      </nav>
+
+      {/* ------------------------------------------------------------ */}
       {/* MODALS & CONFIRMATION DIALOGS                                */}
       {/* ------------------------------------------------------------ */}
+
+      {/* WHOOP Informational Modal */}
+      {whoopModalOpen && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="whoop-modal-heading">
+          <div className="modal-content">
+            <h3 id="whoop-modal-heading" style={{ fontSize: "1.05rem", fontWeight: 700, marginBottom: "10px", color: "var(--text-main)" }}>
+              WHOOP Wearable Connection
+            </h3>
+            <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "14px", lineHeight: "1.5" }}>
+              WHOOP connection will be enabled in a future secure update.
+            </p>
+            <p style={{ fontSize: "0.8rem", color: "var(--text-dim)", marginBottom: "18px", lineHeight: "1.45" }}>
+              This application is currently running as a static export entirely within your browser. Securing wearable OAuth 2.0 credentials and continuous sync requires server-side token handling, which will be introduced in an upcoming privacy-first update.
+            </p>
+            <button
+              type="button"
+              className="btn-primary"
+              style={{ width: "100%" }}
+              onClick={() => setWhoopModalOpen(false)}
+            >
+              Understood
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Edit Task Modal */}
       {editingTask && (
@@ -1013,7 +1304,7 @@ export default function HomeDashboard() {
       {confirmResetOpen && (
         <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="reset-heading">
           <div className="modal-content">
-            <h3 id="reset-heading" style={{ fontSize: "1.05rem", fontWeight: 600, color: "var(--text-main)", marginBottom: "8px" }}>
+            <h3 id="reset-heading" style={{ fontSize: "1.05rem", fontWeight: 600, color: "var(--status-danger-text)", marginBottom: "8px" }}>
               Confirm Data Reset
             </h3>
             <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "16px", lineHeight: "1.4" }}>
@@ -1043,15 +1334,6 @@ export default function HomeDashboard() {
           </div>
         </div>
       )}
-
-      {/* ------------------------------------------------------------ */}
-      {/* Footer                                                       */}
-      {/* ------------------------------------------------------------ */}
-      <footer style={{ marginTop: "auto", paddingTop: "24px" }}>
-        <div className="status-banner status-normal">
-          Local Storage · {state.progression.lifetimeCompletedTasks} Tasks · {state.progression.lifetimeHabitCompletions} Habits
-        </div>
-      </footer>
     </main>
   );
 }

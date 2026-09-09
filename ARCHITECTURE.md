@@ -253,3 +253,42 @@ Possible non-invasive sync paths:
 3. **Encrypted Cloud Drive (Google Drive / iCloud / Dropbox)**:
    - Client-side OAuth to user's personal cloud storage.
    - App stores an encrypted `personal_app_backup.json` file in the user's private app folder.
+
+---
+
+## 9. Future Wearable & Health Integration Architecture (WHOOP)
+
+The application includes a provider-agnostic domain layer (`src/domain/health.ts`) establishing normalized contracts for physiological data: recovery, sleep, cycle strain, and workouts.
+
+### Strict Credential & Secret Isolation Policy
+- **Zero Client Leakage**: WHOOP client secrets, authorization codes, access tokens, refresh tokens, and webhook signature secrets **must never be committed to repository code, exposed in public environment variables (`NEXT_PUBLIC_*`), or stored in browser `localStorage`**.
+- **No Direct Browser-to-WHOOP OAuth**: The WHOOP OAuth 2.0 Authorization Code flow requires client secret exchange (`POST https://api.prod.whoop.com/oauth/oauth2/token`). Performing this in a static client would expose the client secret to anyone inspecting network traffic or application bundle scripts.
+
+### Backend Evolution & Migration Paths
+The current architecture remains a purely static export (`output: "export"`). When live wearable integration is ready to ship, the project will evaluate two secure architectural options:
+1. **Full-Stack Next.js with Server Middleware**:
+   - Migrate `next.config.ts` from static export to standard Vercel server runtime with Route Handlers (`/api/auth/whoop/callback`, `/api/health/sync`).
+   - Pair with an encrypted server-side store (e.g. Vercel KV, Supabase, or PostgreSQL) storing user tokens encrypted with AES-256-GCM.
+2. **Dedicated Micro-Service / Token Relay**:
+   - Keep the static frontend export intact and deploy a lightweight, isolated authentication and token-refresh proxy (e.g. Cloudflare Worker or AWS Lambda) that mediates OAuth exchanges.
+   - **No Token Transmission to Browser**: The relay must **never** return WHOOP bearer tokens (access or refresh) to the browser, even in encrypted form. All WHOOP tokens stay strictly server-side.
+   - **App-Owned Session Cookies**: The server establishes authentication via an app-owned, `HttpOnly`, `Secure`, `SameSite=Strict` session cookie.
+   - **Sanitized Data Only**: Client endpoints return only sanitized, normalized health data (`HealthSnapshot`), never third-party credentials.
+
+### Minimum Required Scopes & Scope Discipline
+The initial health domain contract is intentionally a focused, high-value core slice (`recovery`, `sleep`, `strain`, `workouts`). It does not yet represent all available WHOOP data resources, such as user profile/body measurements (`read:profile`), detailed sleep stage hypnograms, or journal records. In adherence to privacy-first engineering and the principle of least privilege, additional resources will be added only when specific product features require them.
+
+Required initial consent scopes:
+- `read:recovery`: Recovery score, resting heart rate, HRV.
+- `read:cycles`: Daily physiological strain and energy expenditure.
+- `read:sleep`: Sleep duration, performance, and sleep debt/need metrics.
+- `read:workout`: Activity strain and workout sessions.
+
+Official Developer References:
+- [WHOOP OAuth Documentation](https://developer.whoop.com/docs/developing/oauth/)
+- [WHOOP API Scopes Reference](https://developer.whoop.com/api/)
+
+### API Realities & Rate Limits
+- **No Continuous Live Streaming**: The WHOOP Developer API is a REST/Webhook interface providing discrete aggregated cycle records upon calculation completion. It **does not support continuous live heart-rate streaming**; assumptions of per-second live telemetry must not be built into domain or UI models.
+- **Provider Agnosticism**: All progression and reward calculators interface exclusively with `HealthSnapshot`. Swapping WHOOP for Apple Health, Garmin, or manual logging requires only a new adapter implementing `HealthIntegrationProvider`, preserving complete core domain independence.
+

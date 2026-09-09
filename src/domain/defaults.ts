@@ -22,6 +22,11 @@ export const DEFAULT_STAT_DEFINITIONS: readonly StatDefinition[] = [
     description: "Physical health, endurance, recovery, and daily energy.",
   },
   {
+    id: "focus",
+    name: "Focus",
+    description: "Attentive presence, flow state, and cognitive endurance.",
+  },
+  {
     id: "creativity",
     name: "Creativity",
     description: "Synthesis, writing, design, and inventive problem solving.",
