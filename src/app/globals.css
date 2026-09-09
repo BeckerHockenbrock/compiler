@@ -2,6 +2,7 @@
   --bg-main: #090d16;
   --bg-card: #111726;
   --bg-card-hover: #161f33;
+  --bg-card-active: #1e293b;
   --bg-input: #0c121e;
   
   --border-subtle: rgba(255, 255, 255, 0.08);
@@ -49,6 +50,46 @@ html, body {
   display: flex;
   flex-direction: column;
   padding: env(safe-area-inset-top, 16px) 16px env(safe-area-inset-bottom, 24px) 16px;
+}
+
+/* Game Navigation Tabs */
+.nav-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 16px;
+  background: var(--bg-card);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+}
+
+.nav-tab-btn {
+  min-height: 44px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.nav-tab-btn:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.nav-tab-btn.active {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
 }
 
 /* Anime/Game HUD Header */
@@ -195,13 +236,27 @@ html, body {
   border-radius: 2px;
 }
 
-/* Task Form */
+/* Form Styling */
 .task-form {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: 14px;
   margin-bottom: 16px;
+}
+
+.form-group {
+  margin-bottom: 10px;
+}
+
+.form-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
 }
 
 .input-field {
@@ -226,10 +281,12 @@ html, body {
   display: flex;
   gap: 8px;
   margin-top: 10px;
+  flex-wrap: wrap;
 }
 
 .select-field {
   flex: 1;
+  min-width: 120px;
   background: var(--bg-input);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
@@ -240,6 +297,11 @@ html, body {
   min-height: 44px;
 }
 
+.select-field:focus {
+  border-color: var(--border-focus);
+}
+
+/* Buttons */
 .btn-primary {
   min-height: 44px;
   background: linear-gradient(135deg, #0284c7, #2563eb);
@@ -263,7 +325,46 @@ html, body {
   opacity: 0.9;
 }
 
-/* Task Cards */
+.btn-secondary {
+  min-height: 44px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.btn-danger {
+  min-height: 44px;
+  background: rgba(244, 63, 94, 0.12);
+  color: #f43f5e;
+  border: 1px solid rgba(244, 63, 94, 0.3);
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-danger:hover {
+  background: rgba(244, 63, 94, 0.2);
+}
+
+/* Card lists */
 .task-list {
   display: flex;
   flex-direction: column;
@@ -276,7 +377,7 @@ html, body {
   border-radius: var(--radius-md);
   padding: 12px 14px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   transition: border-color 0.2s, background 0.2s;
@@ -313,7 +414,7 @@ html, body {
 .task-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin-top: 6px;
   flex-wrap: wrap;
 }
@@ -355,6 +456,47 @@ html, body {
   border-radius: 4px;
 }
 
+.due-chip {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.due-chip.overdue {
+  color: #f43f5e;
+  background: rgba(244, 63, 94, 0.12);
+  border: 1px solid rgba(244, 63, 94, 0.3);
+}
+
+/* Card Action Group */
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-action-icon {
+  min-width: 44px;
+  min-height: 44px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.btn-action-icon:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.08);
+}
+
 /* Complete Action Button */
 .btn-complete {
   min-width: 44px;
@@ -380,16 +522,110 @@ html, body {
   border-color: #38bdf8;
 }
 
-.btn-complete:active {
-  transform: scale(0.96);
-}
-
 .btn-complete:disabled {
   opacity: 0.4;
   cursor: not-allowed;
   border-color: transparent;
   background: transparent;
   color: var(--text-dim);
+}
+
+/* Habit Card Special Styles */
+.habit-streak-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+/* Skill Card */
+.skill-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.skill-info {
+  flex: 1;
+}
+
+.skill-name {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.skill-level-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(129, 140, 248, 0.15);
+  color: var(--violet-accent);
+}
+
+.skill-desc {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.skill-links {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.skill-link-tag {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+/* Vault / Storage Meter */
+.meter-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.meter-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.meter-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.meter-fill {
+  height: 100%;
+  background: #38bdf8;
+  border-radius: 999px;
 }
 
 /* Empty State */
@@ -417,8 +653,40 @@ html, body {
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+.status-success {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
 .status-error {
   background: rgba(244, 63, 94, 0.1);
   color: #f43f5e;
   border: 1px solid rgba(244, 63, 94, 0.3);
+}
+
+/* Modal overlay & container */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 100;
+}
+
+.modal-content {
+  width: 100%;
+  max-width: 440px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-active);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
 }

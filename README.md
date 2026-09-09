@@ -48,6 +48,34 @@ npm run lint
 
 ---
 
+## Application Features
+
+- **⚔️ Quests & Tasks**:
+  - Task creation with title, priority (`low`, `medium`, `high`, `urgent`), due date, and XP rewards.
+  - Inline editing of pending quests (title, priority, due date, XP reward).
+  - Deletion of pending quests with interactive confirmation.
+  - Idempotent quest completion awarding XP, leveling up the character, and granting skill points without duplicate rewards.
+- **🔥 Daily Rituals & Habits**:
+  - Habit creation with customizable daily XP rewards.
+  - Calendar-day check-in logic that respects the user's local timezone.
+  - Prevention of duplicate check-ins on the same calendar day.
+  - Streak tracking (current streak and best all-time streak) with automatic streak break detection.
+- **📜 Status & Skill Trees**:
+  - RPG-style character status HUD: Level, Current XP, Next Level Threshold, Progress Bar, and Available Skill Points.
+  - Core Attributes: Discipline, Knowledge, Vitality, Focus, and Craft.
+  - Interactive Skill Point Allocation: Allocate earned points to rank up skills and boost linked core attributes (+5 per rank).
+- **🛡️ Vault & Data Ownership**:
+  - Real-time estimated `localStorage` usage meter.
+  - One-click JSON backup export with accidental-corruption checksumming.
+  - Safe backup restore pipeline with in-memory validation, confirmation prompts, and automatic pre-import safety snapshots (`personal_app:backup:pre_import`).
+  - Safe reset to factory defaults with confirmation gate.
+- **📱 Mobile-First Game-HUD Design**:
+  - Full support for mobile devices with minimum 44px touch targets.
+  - iPhone safe-area inset accommodation.
+  - Dark game/anime aesthetic with cybernetic borders, glowing accents, and reactive feedback.
+
+---
+
 ## Testing Guide
 
 The project uses [Vitest](https://vitest.dev/) for fast, isolated unit testing.
@@ -60,14 +88,26 @@ npm run test
 ### Run Targeted Tests
 To target a specific test suite or file, use the `--` delimiter:
 ```bash
-# Test progression formulas
+# Test quest / task lifecycle (creation, update, delete, completion, idempotency)
+npm run test -- tests/domain/tasks.test.ts
+
+# Test habit lifecycle and calendar-day streak tracking
+npm run test -- tests/domain/habits.test.ts
+
+# Test skill point allocation and linked attribute scaling
+npm run test -- tests/domain/skills.test.ts
+
+# Test progression formulas and leveling curves
 npm run test -- tests/domain/progression.test.ts
 
 # Test date-time and timezone rules
 npm run test -- tests/domain/date-time.test.ts
 
-# Test habit streaks
+# Test habit streak engine
 npm run test -- tests/domain/streaks.test.ts
+
+# Test end-to-end persistence flow across store reloads
+npm run test -- tests/storage/persistence-flow.test.ts
 
 # Test namespaced storage adapter
 npm run test -- tests/storage/adapter.test.ts

@@ -28,16 +28,21 @@ This document specifies the technical architecture, domain modeling principles, 
 │   └── workflows/
 │       └── ci.yml             # Continuous integration (typecheck, lint, test, static build)
 ├── src/
-│   ├── app/                   # Next.js App Router (Static export shell only)
-│   │   ├── globals.css        # Minimal CSS variables and base resets
+│   ├── app/                   # Next.js App Router (Static export shell)
+│   │   ├── globals.css        # Theme variables, mobile-first responsive layout, and game HUD
 │   │   ├── layout.tsx         # Root layout (viewport, title, static shell)
-│   │   └── page.tsx           # Entry static page
+│   │   └── page.tsx           # Mobile-first dashboard (Quests, Rituals, Character, Vault)
 │   ├── domain/                # Pure domain layer (ZERO React/DOM/Storage dependencies)
 │   │   ├── types.ts           # Core domain entity types & interfaces
 │   │   ├── date-time.ts       # Strict ISO 8601 UTC & local calendar date logic
 │   │   ├── progression.ts     # XP formulas, level curves, and reward state transitions
 │   │   ├── streaks.ts         # Habit streak calculations evaluated on calendar days
+│   │   ├── tasks.ts           # Pure task creation, update, deletion, and idempotent completion
+│   │   ├── habits.ts          # Pure habit creation, deletion, and single daily check-in
+│   │   ├── skills.ts          # Pure skill point allocation and linked attribute scaling
 │   │   └── defaults.ts        # Initial seed state and default entities
+│   ├── hooks/                 # React client integration
+│   │   └── use-app-store.ts   # Client store linking StorageManager to UI with hydration safety
 │   ├── storage/               # Persistence, validation, migration & backup layer
 │   │   ├── types.ts           # StorageAdapter interface, StorageEnvelope, error types
 │   │   ├── schema.ts          # Zod validation schemas & CURRENT_SCHEMA_VERSION = 1
@@ -51,8 +56,8 @@ This document specifies the technical architecture, domain modeling principles, 
 │   └── lib/                   # Shared utility primitives
 │       └── result.ts          # Type-safe Result<T, E> discriminated union
 ├── tests/                     # Vitest automated unit test suites
-│   ├── domain/                # Tests for progression, date-time, and streaks
-│   └── storage/               # Tests for adapter, migrations, corrupt data, backup, compaction
+│   ├── domain/                # Tests for progression, date-time, streaks, tasks, habits, skills
+│   └── storage/               # Tests for adapter, migrations, corrupt data, backup, compaction, persistence flow
 ├── ARCHITECTURE.md            # Architectural blueprint and specifications
 ├── README.md                  # Developer manual, backup runbook, and deployment guide
 ├── next.config.ts             # Next.js static export configuration (output: 'export')
