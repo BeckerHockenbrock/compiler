@@ -5,7 +5,46 @@ import { useAppStore } from "@/hooks/use-app-store";
 import type { Task, TaskPriority } from "@/domain/types";
 import { toLocalDate, nowUtc } from "@/domain/date-time";
 
-type ActiveTab = "quests" | "character" | "vault";
+type ActiveTab = "tasks" | "progress" | "data";
+
+function EditIcon() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+      <path d="m15 5 4 4" />
+    </svg>
+  );
+}
+
+function DeleteIcon() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 6h18" />
+      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+    </svg>
+  );
+}
 
 export default function HomeDashboard() {
   const {
@@ -27,7 +66,7 @@ export default function HomeDashboard() {
     resetDefaults,
   } = useAppStore();
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>("quests");
+  const [activeTab, setActiveTab] = useState<ActiveTab>("tasks");
 
   // Task creation state
   const [taskTitle, setTaskTitle] = useState("");
@@ -61,6 +100,8 @@ export default function HomeDashboard() {
   const priorityId = useId();
   const xpId = useId();
   const dueDateId = useId();
+  const habitTitleId = useId();
+  const habitXpId = useId();
 
   const todayDate = state ? toLocalDate(nowUtc(), state.settings.timeZone) : "";
 
@@ -92,7 +133,7 @@ export default function HomeDashboard() {
       setTaskPriority("medium");
       setTaskXp(50);
       setTaskDueDate("");
-      setFeedbackMsg({ type: "success", text: "Quest assigned successfully." });
+      setFeedbackMsg({ type: "success", text: "Task created." });
     }
   };
 
@@ -117,7 +158,7 @@ export default function HomeDashboard() {
 
     if (ok) {
       setEditingTask(null);
-      setFeedbackMsg({ type: "success", text: "Quest updated." });
+      setFeedbackMsg({ type: "success", text: "Task updated." });
     }
   };
 
@@ -135,7 +176,7 @@ export default function HomeDashboard() {
       setHabitTitle("");
       setHabitXp(35);
       setShowAddHabit(false);
-      setFeedbackMsg({ type: "success", text: "Daily ritual established." });
+      setFeedbackMsg({ type: "success", text: "Habit established." });
     }
   };
 
@@ -147,7 +188,7 @@ export default function HomeDashboard() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `personal_progression_backup_${todayDate || "export"}.json`;
+    a.download = `focus_app_backup_${todayDate || "export"}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -190,8 +231,9 @@ export default function HomeDashboard() {
   if (!isHydrated) {
     return (
       <main className="app-viewport" style={{ justifyContent: "center", alignItems: "center" }}>
-        <div style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
-          Initializing progression system...
+        <h1 className="sr-only">Personal Focus & Progression Dashboard</h1>
+        <div style={{ color: "var(--text-muted)", fontSize: "0.88rem" }}>
+          Loading workspace...
         </div>
       </main>
     );
@@ -200,8 +242,11 @@ export default function HomeDashboard() {
   if (error) {
     return (
       <main className="app-viewport" style={{ justifyContent: "center" }}>
-        <div className="hud-card" style={{ textAlign: "center" }}>
-          <h2 style={{ color: "var(--rose-accent)", marginBottom: "8px" }}>Storage Unavailable</h2>
+        <h1 className="sr-only">Personal Focus & Progression Dashboard</h1>
+        <div className="overview-card" style={{ textAlign: "center" }}>
+          <h2 style={{ color: "var(--text-main)", marginBottom: "8px", fontSize: "1.1rem" }}>
+            Storage Unavailable
+          </h2>
           <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", lineHeight: "1.5" }}>
             {error.message}
           </p>
@@ -216,97 +261,103 @@ export default function HomeDashboard() {
 
   const pendingTasks = state.tasks.filter((t) => t.status === "pending");
   const completedTasks = state.tasks.filter((t) => t.status === "completed");
-
-  const statEntries = state.statDefinitions.map((def) => {
-    const val = state.stats[def.id]?.current ?? 0;
-    return { id: def.id, name: def.name, value: val };
-  });
+  const habitsDoneToday = state.habits.filter((h) => h.lastCompletedDate === todayDate);
 
   return (
     <main className="app-viewport">
+      {/* Visually hidden primary heading for accessible document outline */}
+      <h1 className="sr-only">Personal Focus & Progression Dashboard</h1>
+
       {/* ------------------------------------------------------------ */}
-      {/* Anime / Game HUD Header                                      */}
+      {/* Overview & Progression Summary                               */}
       {/* ------------------------------------------------------------ */}
-      <section className="hud-card">
-        <div className="hud-top-bar">
-          <span className="level-badge">LV. {levelProgress.level} Adventurer</span>
-          <span className="points-pill">
-            {state.progression.availableSkillPoints} Skill Points
-          </span>
+      <section className="overview-card" aria-label="Progression Overview">
+        <div className="overview-top-bar">
+          <div className="profile-badge">
+            <span>Level {levelProgress.level}</span>
+            <span className="profile-badge-sub">· Focus Progression</span>
+          </div>
+          {state.progression.availableSkillPoints > 0 ? (
+            <span className="points-pill">
+              {state.progression.availableSkillPoints} Skill Points Available
+            </span>
+          ) : (
+            <span style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>
+              {todayDate}
+            </span>
+          )}
         </div>
 
-        {/* Level XP Gauge */}
-        <div className="xp-container">
-          <div className="xp-label-row">
-            <span>EXP PROGRESS</span>
+        {/* Level Progress Gauge */}
+        <div className="progress-container">
+          <div className="progress-label-row">
+            <span>Level Progress</span>
             <span>
-              {levelProgress.currentLevelXp} / {levelProgress.requiredLevelXp} ({Math.round(levelProgress.progressRatio * 100)}%)
+              {levelProgress.currentLevelXp} / {levelProgress.requiredLevelXp} XP ({Math.round(levelProgress.progressRatio * 100)}%)
             </span>
           </div>
-          <div className="xp-bar-track">
+          <div className="progress-bar-track">
             <div
-              className="xp-bar-fill"
-              style={{ width: `${Math.max(4, Math.min(100, levelProgress.progressRatio * 100))}%` }}
+              className="progress-bar-fill"
+              style={{ width: `${Math.max(3, Math.min(100, levelProgress.progressRatio * 100))}%` }}
             />
           </div>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              fontSize: "0.7rem",
-              color: "var(--text-dim)",
-              marginTop: "4px",
-            }}
-          >
-            <span>Total: {state.progression.totalXp} XP</span>
+          <div className="progress-meta-row">
+            <span>Total XP: {state.progression.totalXp}</span>
             <span>Next Level: {levelProgress.nextLevelXp} XP</span>
           </div>
         </div>
 
-        {/* Top 3 Stats Bar */}
-        <div className="stats-grid">
-          {statEntries.slice(0, 3).map((stat) => (
-            <div key={stat.id} className="stat-item">
-              <span className="stat-name">{stat.name}</span>
-              <span className="stat-val">+{stat.value}</span>
-            </div>
-          ))}
+        {/* Time-Centered Focus Metrics Grid */}
+        <div className="focus-metrics-grid">
+          <div className="focus-metric-item">
+            <span className="focus-metric-label">Active Tasks</span>
+            <span className="focus-metric-val">{pendingTasks.length}</span>
+          </div>
+          <div className="focus-metric-item">
+            <span className="focus-metric-label">Daily Habits</span>
+            <span className="focus-metric-val">{habitsDoneToday.length} / {state.habits.length}</span>
+          </div>
+          <div className="focus-metric-item">
+            <span className="focus-metric-label">Focus Session</span>
+            <span className="focus-metric-val" style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Ready</span>
+          </div>
         </div>
       </section>
 
       {/* ------------------------------------------------------------ */}
-      {/* Tab Navigation                                               */}
+      {/* Navigation Tabs (Restrained, Monochrome)                     */}
       {/* ------------------------------------------------------------ */}
       <nav className="nav-tabs" aria-label="Main Navigation">
         <button
           type="button"
-          className={`nav-tab-btn ${activeTab === "quests" ? "active" : ""}`}
-          onClick={() => setActiveTab("quests")}
+          className={`nav-tab-btn ${activeTab === "tasks" ? "active" : ""}`}
+          onClick={() => setActiveTab("tasks")}
         >
-          ⚔️ Quests
+          Tasks
         </button>
         <button
           type="button"
-          className={`nav-tab-btn ${activeTab === "character" ? "active" : ""}`}
-          onClick={() => setActiveTab("character")}
+          className={`nav-tab-btn ${activeTab === "progress" ? "active" : ""}`}
+          onClick={() => setActiveTab("progress")}
         >
-          📜 Status
+          Progress
         </button>
         <button
           type="button"
-          className={`nav-tab-btn ${activeTab === "vault" ? "active" : ""}`}
-          onClick={() => setActiveTab("vault")}
+          className={`nav-tab-btn ${activeTab === "data" ? "active" : ""}`}
+          onClick={() => setActiveTab("data")}
         >
-          🛡️ Vault
+          Data
         </button>
       </nav>
 
-      {/* Temporary feedback banner */}
+      {/* Feedback banner */}
       {feedbackMsg && (
         <div
           className={`status-banner ${feedbackMsg.type === "success" ? "status-success" : "status-error"}`}
           onClick={() => setFeedbackMsg(null)}
-          style={{ cursor: "pointer", marginBottom: "12px", marginTop: "0" }}
+          style={{ cursor: "pointer", marginBottom: "16px", marginTop: "0" }}
           role="status"
         >
           {feedbackMsg.text} (tap to dismiss)
@@ -314,59 +365,65 @@ export default function HomeDashboard() {
       )}
 
       {/* ------------------------------------------------------------ */}
-      {/* TAB 1: QUESTS & RITUALS                                      */}
+      {/* TAB 1: TASKS & DAILY PRACTICES                               */}
       {/* ------------------------------------------------------------ */}
-      {activeTab === "quests" && (
+      {activeTab === "tasks" && (
         <>
-          {/* Daily Rituals (Habits) */}
-          <section style={{ marginBottom: "20px" }}>
+          {/* Daily Habits */}
+          <section style={{ marginBottom: "24px" }}>
             <div className="section-header">
-              <h2 className="section-title">Daily Rituals ({state.habits.length})</h2>
+              <h2 className="section-title">Daily Habits ({state.habits.length})</h2>
               <button
                 type="button"
                 className="btn-secondary"
-                style={{ minHeight: "36px", padding: "0 10px", fontSize: "0.75rem" }}
+                style={{ minHeight: "36px", padding: "0 10px", fontSize: "0.78rem" }}
                 onClick={() => setShowAddHabit(!showAddHabit)}
               >
-                {showAddHabit ? "Cancel" : "+ New Ritual"}
+                {showAddHabit ? "Cancel" : "+ New Habit"}
               </button>
             </div>
 
             {showAddHabit && (
               <form className="task-form" onSubmit={handleCreateHabit}>
                 <div className="form-group">
-                  <label className="form-label" htmlFor="habit-title">Ritual Name</label>
+                  <label className="form-label" htmlFor={habitTitleId}>Habit Name</label>
                   <input
-                    id="habit-title"
+                    id={habitTitleId}
                     type="text"
                     className="input-field"
-                    placeholder="e.g. 30m Morning Reading"
+                    placeholder="e.g., 45m Focused Study"
                     value={habitTitle}
                     onChange={(e) => setHabitTitle(e.target.value)}
                     required
                   />
                 </div>
                 <div className="form-row">
-                  <select
-                    className="select-field"
-                    value={habitXp}
-                    onChange={(e) => setHabitXp(Number(e.target.value))}
-                    aria-label="Ritual XP Reward"
-                  >
-                    <option value={20}>+20 XP</option>
-                    <option value={35}>+35 XP</option>
-                    <option value={50}>+50 XP</option>
-                  </select>
-                  <button type="submit" className="btn-primary" disabled={!habitTitle.trim()}>
-                    Establish
-                  </button>
+                  <div style={{ flex: 1 }}>
+                    <label className="form-label" htmlFor={habitXpId}>XP Reward</label>
+                    <select
+                      id={habitXpId}
+                      className="select-field"
+                      style={{ width: "100%" }}
+                      value={habitXp}
+                      onChange={(e) => setHabitXp(Number(e.target.value))}
+                    >
+                      <option value={20}>+20 XP</option>
+                      <option value={35}>+35 XP</option>
+                      <option value={50}>+50 XP</option>
+                    </select>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "flex-end" }}>
+                    <button type="submit" className="btn-primary" disabled={!habitTitle.trim()}>
+                      Add Habit
+                    </button>
+                  </div>
                 </div>
               </form>
             )}
 
             {state.habits.length === 0 ? (
               <div className="empty-state">
-                No daily rituals yet. Establish a habit to build recurring daily streaks!
+                No habits yet. Establish a daily practice to build consistency.
               </div>
             ) : (
               <div className="task-list">
@@ -378,7 +435,7 @@ export default function HomeDashboard() {
                         <div className="task-title">{habit.title}</div>
                         <div className="task-meta">
                           <span className="habit-streak-badge">
-                            🔥 {habit.streakCurrent} {habit.streakCurrent === 1 ? "day" : "days"}
+                            {habit.streakCurrent} {habit.streakCurrent === 1 ? "day streak" : "day streak"}
                           </span>
                           <span className="reward-chip">+{habit.xpReward} XP</span>
                           {habit.streakBest > 0 && (
@@ -395,17 +452,17 @@ export default function HomeDashboard() {
                           className="btn-complete"
                           onClick={() => finishHabit(habit.id)}
                           disabled={isDoneToday}
-                          aria-label={isDoneToday ? "Ritual already completed today" : `Check in for ${habit.title}`}
+                          aria-label={isDoneToday ? "Habit completed today" : `Check in for ${habit.title}`}
                         >
-                          {isDoneToday ? "✓ Done Today" : "⚡ Check In"}
+                          {isDoneToday ? "Completed" : "Check In"}
                         </button>
                         <button
                           type="button"
                           className="btn-action-icon"
                           onClick={() => setHabitToDelete(habit.id)}
-                          aria-label={`Delete ${habit.title}`}
+                          aria-label={`Delete habit: ${habit.title}`}
                         >
-                          🗑
+                          <DeleteIcon />
                         </button>
                       </div>
                     </div>
@@ -415,19 +472,19 @@ export default function HomeDashboard() {
             )}
           </section>
 
-          {/* Quest Creation Form */}
+          {/* Task Creation Form */}
           <section>
             <div className="section-header">
-              <h2 className="section-title">Assign Quest</h2>
+              <h2 className="section-title">New Task</h2>
             </div>
             <form className="task-form" onSubmit={handleCreateTask}>
               <div className="form-group">
-                <label className="form-label" htmlFor={titleId}>Quest Title</label>
+                <label className="form-label" htmlFor={titleId}>Task Title</label>
                 <input
                   id={titleId}
                   type="text"
                   className="input-field"
-                  placeholder="Quest objective (e.g. Finish compiler assignment)"
+                  placeholder="e.g., Read compiler chapter 4"
                   value={taskTitle}
                   onChange={(e) => setTaskTitle(e.target.value)}
                   required
@@ -443,9 +500,9 @@ export default function HomeDashboard() {
                     value={taskPriority}
                     onChange={(e) => setTaskPriority(e.target.value as TaskPriority)}
                   >
-                    <option value="low">Low Priority</option>
+                    <option value="low">Low</option>
                     <option value="medium">Medium</option>
-                    <option value="high">High Priority</option>
+                    <option value="high">High</option>
                     <option value="urgent">Urgent</option>
                   </select>
                 </div>
@@ -465,7 +522,7 @@ export default function HomeDashboard() {
                   </select>
                 </div>
 
-                <div style={{ flex: "1 1 140px" }}>
+                <div style={{ flex: "1 1 130px" }}>
                   <label className="form-label" htmlFor={dueDateId}>Due Date</label>
                   <input
                     id={dueDateId}
@@ -481,10 +538,10 @@ export default function HomeDashboard() {
               <button
                 type="submit"
                 className="btn-primary"
-                style={{ width: "100%", marginTop: "12px" }}
+                style={{ width: "100%", marginTop: "14px" }}
                 disabled={!taskTitle.trim()}
               >
-                Accept Quest
+                Add Task
               </button>
             </form>
           </section>
@@ -492,12 +549,12 @@ export default function HomeDashboard() {
           {/* Pending Tasks Section */}
           <section>
             <div className="section-header">
-              <h2 className="section-title">Active Quests ({pendingTasks.length})</h2>
+              <h2 className="section-title">Active Tasks ({pendingTasks.length})</h2>
             </div>
 
             {pendingTasks.length === 0 ? (
               <div className="empty-state">
-                No active quests. Assign a task above to begin progression.
+                No active tasks. Add a task above to begin your focus session.
               </div>
             ) : (
               <div className="task-list">
@@ -514,7 +571,7 @@ export default function HomeDashboard() {
                           <span className="reward-chip">+{task.xpReward} XP</span>
                           {task.dueDate && (
                             <span className={`due-chip ${isOverdue ? "overdue" : ""}`}>
-                              {isOverdue ? "⚠️ Overdue: " : "Due: "}{task.dueDate}
+                              {isOverdue ? "Overdue: " : "Due: "}{task.dueDate}
                             </span>
                           )}
                         </div>
@@ -525,25 +582,25 @@ export default function HomeDashboard() {
                           type="button"
                           className="btn-complete"
                           onClick={() => finishTask(task.id)}
-                          aria-label={`Complete ${task.title}`}
+                          aria-label={`Complete task: ${task.title}`}
                         >
-                          ✓ Complete
+                          Complete
                         </button>
                         <button
                           type="button"
                           className="btn-action-icon"
                           onClick={() => handleOpenEdit(task)}
-                          aria-label={`Edit ${task.title}`}
+                          aria-label={`Edit task: ${task.title}`}
                         >
-                          ✎
+                          <EditIcon />
                         </button>
                         <button
                           type="button"
                           className="btn-action-icon"
                           onClick={() => setTaskToDelete(task.id)}
-                          aria-label={`Delete ${task.title}`}
+                          aria-label={`Delete task: ${task.title}`}
                         >
-                          🗑
+                          <DeleteIcon />
                         </button>
                       </div>
                     </div>
@@ -557,14 +614,14 @@ export default function HomeDashboard() {
           {completedTasks.length > 0 && (
             <section style={{ marginTop: "24px" }}>
               <div className="section-header">
-                <h2 className="section-title">Completed Log ({completedTasks.length})</h2>
+                <h2 className="section-title">Completed Tasks ({completedTasks.length})</h2>
                 <button
                   type="button"
                   onClick={() => setShowCompletedTasks(!showCompletedTasks)}
                   className="btn-secondary"
-                  style={{ minHeight: "32px", padding: "0 8px", fontSize: "0.75rem" }}
+                  style={{ minHeight: "32px", padding: "0 10px", fontSize: "0.75rem" }}
                 >
-                  {showCompletedTasks ? "Hide Log" : "Show Log"}
+                  {showCompletedTasks ? "Hide Completed" : "Show Completed"}
                 </button>
               </div>
 
@@ -577,7 +634,7 @@ export default function HomeDashboard() {
                         <div className="task-meta">
                           <span className="priority-tag priority-low">Completed</span>
                           <span style={{ fontSize: "0.7rem", color: "var(--text-dim)" }}>
-                            +{task.xpReward} XP awarded
+                            +{task.xpReward} XP
                           </span>
                         </div>
                       </div>
@@ -594,9 +651,9 @@ export default function HomeDashboard() {
       )}
 
       {/* ------------------------------------------------------------ */}
-      {/* TAB 2: CHARACTER & ATTRIBUTES                                */}
+      {/* TAB 2: PROGRESS & ATTRIBUTES                                 */}
       {/* ------------------------------------------------------------ */}
-      {activeTab === "character" && (
+      {activeTab === "progress" && (
         <>
           {/* Skill points alert banner */}
           {state.progression.availableSkillPoints > 0 && (
@@ -604,14 +661,14 @@ export default function HomeDashboard() {
               className="status-banner status-success"
               style={{ marginBottom: "16px", marginTop: "0", textAlign: "left" }}
             >
-              ⚡ <strong>{state.progression.availableSkillPoints} Skill Point(s) Available!</strong> Allocate points to level up skills and increase your core attributes.
+              <strong>{state.progression.availableSkillPoints} Skill Point(s) Available.</strong> Allocate points to advance focus skills and increase core attributes.
             </div>
           )}
 
           {/* Skills Section */}
           <section style={{ marginBottom: "24px" }}>
             <div className="section-header">
-              <h2 className="section-title">Skills & Masteries</h2>
+              <h2 className="section-title">Skills & Focus Areas</h2>
             </div>
 
             <div className="task-list">
@@ -620,7 +677,7 @@ export default function HomeDashboard() {
                   <div className="skill-info">
                     <div className="skill-name">
                       <span>{skill.name}</span>
-                      <span className="skill-level-badge">LV. {skill.level}</span>
+                      <span className="skill-level-badge">Level {skill.level}</span>
                     </div>
                     <div className="skill-desc">{skill.description}</div>
                     <div className="skill-links">
@@ -634,11 +691,11 @@ export default function HomeDashboard() {
 
                   <button
                     type="button"
-                    className="btn-primary"
-                    style={{ minHeight: "44px", padding: "0 12px", whiteSpace: "nowrap" }}
+                    className="btn-secondary"
+                    style={{ minHeight: "44px", padding: "0 14px", whiteSpace: "nowrap" }}
                     onClick={() => assignSkillPoint(skill.id)}
                     disabled={state.progression.availableSkillPoints <= 0}
-                    aria-label={`Rank up skill ${skill.name}`}
+                    aria-label={`Advance skill ${skill.name}`}
                   >
                     +1 Rank
                   </button>
@@ -650,7 +707,7 @@ export default function HomeDashboard() {
           {/* Core Attributes Breakdown */}
           <section>
             <div className="section-header">
-              <h2 className="section-title">Status Attributes</h2>
+              <h2 className="section-title">Core Attributes</h2>
             </div>
 
             <div className="task-list">
@@ -661,13 +718,13 @@ export default function HomeDashboard() {
                     <div className="task-info">
                       <div className="task-title" style={{ display: "flex", justifyContent: "space-between" }}>
                         <span>{def.name}</span>
-                        <span style={{ color: "#38bdf8", fontWeight: 700 }}>+{statVal.current}</span>
+                        <span style={{ fontWeight: 600, color: "var(--text-main)" }}>+{statVal.current}</span>
                       </div>
                       <p style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: "2px" }}>
                         {def.description}
                       </p>
                       <div style={{ fontSize: "0.68rem", color: "var(--text-dim)", marginTop: "4px" }}>
-                        Lifetime Earned: +{statVal.lifetimeEarned} pts
+                        Lifetime: +{statVal.lifetimeEarned} pts
                       </div>
                     </div>
                   </div>
@@ -679,9 +736,9 @@ export default function HomeDashboard() {
       )}
 
       {/* ------------------------------------------------------------ */}
-      {/* TAB 3: VAULT & DATA OWNERSHIP                                */}
+      {/* TAB 3: DATA & BACKUP                                         */}
       {/* ------------------------------------------------------------ */}
-      {activeTab === "vault" && (
+      {activeTab === "data" && (
         <>
           {/* Storage Meter */}
           <section className="meter-card">
@@ -702,7 +759,7 @@ export default function HomeDashboard() {
               />
             </div>
             <p style={{ fontSize: "0.72rem", color: "var(--text-dim)", marginTop: "8px", lineHeight: "1.4" }}>
-              All progress is persisted securely in your browser&apos;s isolated namespaced storage. No external servers or telemetry are used.
+              All application state is kept locally in browser storage. No external servers or remote telemetry are used.
             </p>
           </section>
 
@@ -714,9 +771,9 @@ export default function HomeDashboard() {
 
             <div className="task-card" style={{ flexDirection: "column", gap: "12px", alignItems: "stretch" }}>
               <div>
-                <h3 style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--text-main)" }}>Export Data Vault</h3>
+                <h3 style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--text-main)" }}>Export Local Data</h3>
                 <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "2px" }}>
-                  Download a validated JSON backup containing all tasks, rituals, progression, and history.
+                  Download a validated JSON backup containing all tasks, habits, progression, and logs.
                 </p>
               </div>
               <button
@@ -725,19 +782,19 @@ export default function HomeDashboard() {
                 onClick={handleExportBackup}
                 style={{ width: "100%" }}
               >
-                📥 Download JSON Backup
+                Download JSON Backup
               </button>
             </div>
 
             <div className="task-card" style={{ flexDirection: "column", gap: "12px", alignItems: "stretch", marginTop: "12px" }}>
               <div>
-                <h3 style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--text-main)" }}>Restore Data Vault</h3>
+                <h3 style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--text-main)" }}>Restore Local Data</h3>
                 <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "2px" }}>
-                  Select a backup file to restore. The system validates and snapshots existing state before applying.
+                  Select a backup file to restore. Existing state is automatically saved to a pre-import snapshot before restoration.
                 </p>
               </div>
               <label className="btn-secondary" style={{ width: "100%", textAlign: "center", cursor: "pointer" }}>
-                <span>📤 Choose Backup File</span>
+                <span>Select Backup File</span>
                 <input
                   type="file"
                   accept=".json,application/json"
@@ -750,9 +807,9 @@ export default function HomeDashboard() {
             {/* Storage Reset */}
             <div className="task-card" style={{ flexDirection: "column", gap: "12px", alignItems: "stretch", marginTop: "12px" }}>
               <div>
-                <h3 style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--rose-accent)" }}>Danger Zone</h3>
+                <h3 style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--text-main)" }}>Reset Workspace</h3>
                 <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "2px" }}>
-                  Reset application data back to initial seed defaults. Requires confirmation.
+                  Reset application data back to initial defaults. All local state will be restored to initial values.
                 </p>
               </div>
               <button
@@ -760,7 +817,7 @@ export default function HomeDashboard() {
                 className="btn-danger"
                 onClick={() => setConfirmResetOpen(true)}
               >
-                ⚠️ Reset to Initial Defaults
+                Reset to Initial Defaults
               </button>
             </div>
           </section>
@@ -773,10 +830,10 @@ export default function HomeDashboard() {
 
       {/* Edit Task Modal */}
       {editingTask && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="edit-quest-title">
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="edit-task-heading">
           <div className="modal-content">
-            <h3 id="edit-quest-title" style={{ fontSize: "1.05rem", fontWeight: 700, marginBottom: "12px", color: "#38bdf8" }}>
-              Edit Quest
+            <h3 id="edit-task-heading" style={{ fontSize: "1.05rem", fontWeight: 600, marginBottom: "14px", color: "var(--text-main)" }}>
+              Edit Task
             </h3>
             <form onSubmit={handleSaveEdit}>
               <div className="form-group">
@@ -853,13 +910,13 @@ export default function HomeDashboard() {
 
       {/* Delete Task Confirmation */}
       {taskToDelete && (
-        <div className="modal-overlay" role="dialog" aria-modal="true">
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="delete-task-heading">
           <div className="modal-content">
-            <h3 style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--rose-accent)", marginBottom: "8px" }}>
-              Discard Quest?
+            <h3 id="delete-task-heading" style={{ fontSize: "1.05rem", fontWeight: 600, color: "var(--text-main)", marginBottom: "8px" }}>
+              Delete Task?
             </h3>
             <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "16px", lineHeight: "1.4" }}>
-              Are you sure you want to delete this pending quest? This action cannot be undone.
+              Are you sure you want to delete this pending task? This action cannot be undone.
             </p>
             <div style={{ display: "flex", gap: "8px" }}>
               <button
@@ -869,10 +926,10 @@ export default function HomeDashboard() {
                 onClick={() => {
                   removeTask(taskToDelete);
                   setTaskToDelete(null);
-                  setFeedbackMsg({ type: "success", text: "Quest discarded." });
+                  setFeedbackMsg({ type: "success", text: "Task deleted." });
                 }}
               >
-                Yes, Discard
+                Delete Task
               </button>
               <button
                 type="button"
@@ -888,13 +945,13 @@ export default function HomeDashboard() {
 
       {/* Delete Habit Confirmation */}
       {habitToDelete && (
-        <div className="modal-overlay" role="dialog" aria-modal="true">
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="delete-habit-heading">
           <div className="modal-content">
-            <h3 style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--rose-accent)", marginBottom: "8px" }}>
-              Remove Daily Ritual?
+            <h3 id="delete-habit-heading" style={{ fontSize: "1.05rem", fontWeight: 600, color: "var(--text-main)", marginBottom: "8px" }}>
+              Delete Habit?
             </h3>
             <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "16px", lineHeight: "1.4" }}>
-              Removing this habit will remove its active daily streak. Lifetime aggregates will remain safe.
+              Removing this habit will stop active streak tracking. Historical progression remains intact.
             </p>
             <div style={{ display: "flex", gap: "8px" }}>
               <button
@@ -904,10 +961,10 @@ export default function HomeDashboard() {
                 onClick={() => {
                   removeHabit(habitToDelete);
                   setHabitToDelete(null);
-                  setFeedbackMsg({ type: "success", text: "Ritual removed." });
+                  setFeedbackMsg({ type: "success", text: "Habit deleted." });
                 }}
               >
-                Remove
+                Delete Habit
               </button>
               <button
                 type="button"
@@ -923,13 +980,13 @@ export default function HomeDashboard() {
 
       {/* Restore Confirmation Dialog */}
       {pendingImportFile && (
-        <div className="modal-overlay" role="dialog" aria-modal="true">
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="restore-heading">
           <div className="modal-content">
-            <h3 style={{ fontSize: "1.05rem", fontWeight: 700, color: "#38bdf8", marginBottom: "8px" }}>
-              Confirm Vault Restoration
+            <h3 id="restore-heading" style={{ fontSize: "1.05rem", fontWeight: 600, color: "var(--text-main)", marginBottom: "8px" }}>
+              Confirm Data Restore
             </h3>
             <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "16px", lineHeight: "1.4" }}>
-              Restoring this backup will replace current tasks, habits, and attributes. A pre-import safety backup will be created automatically. Proceed?
+              Restoring this backup will replace current tasks, habits, and attributes. A pre-import safety snapshot is created automatically before applying. Continue?
             </p>
             <div style={{ display: "flex", gap: "8px" }}>
               <button
@@ -938,7 +995,7 @@ export default function HomeDashboard() {
                 style={{ flex: 1 }}
                 onClick={handleConfirmImport}
               >
-                Yes, Restore Vault
+                Restore Backup
               </button>
               <button
                 type="button"
@@ -954,13 +1011,13 @@ export default function HomeDashboard() {
 
       {/* Reset Confirmation Dialog */}
       {confirmResetOpen && (
-        <div className="modal-overlay" role="dialog" aria-modal="true">
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="reset-heading">
           <div className="modal-content">
-            <h3 style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--rose-accent)", marginBottom: "8px" }}>
-              Confirm Full Reset
+            <h3 id="reset-heading" style={{ fontSize: "1.05rem", fontWeight: 600, color: "var(--text-main)", marginBottom: "8px" }}>
+              Confirm Data Reset
             </h3>
             <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "16px", lineHeight: "1.4" }}>
-              Are you completely sure you want to reset all tasks, habits, levels, and attributes back to initial seed state?
+              Are you sure you want to reset all tasks, habits, levels, and attributes back to initial defaults?
             </p>
             <div style={{ display: "flex", gap: "8px" }}>
               <button
@@ -970,10 +1027,10 @@ export default function HomeDashboard() {
                 onClick={() => {
                   resetDefaults();
                   setConfirmResetOpen(false);
-                  setFeedbackMsg({ type: "success", text: "Reset to initial defaults complete." });
+                  setFeedbackMsg({ type: "success", text: "Reset complete." });
                 }}
               >
-                Yes, Reset Everything
+                Reset All Data
               </button>
               <button
                 type="button"
@@ -990,9 +1047,9 @@ export default function HomeDashboard() {
       {/* ------------------------------------------------------------ */}
       {/* Footer                                                       */}
       {/* ------------------------------------------------------------ */}
-      <footer style={{ marginTop: "auto", paddingTop: "20px" }}>
+      <footer style={{ marginTop: "auto", paddingTop: "24px" }}>
         <div className="status-banner status-normal">
-          Local Storage · {state.progression.lifetimeCompletedTasks} Quests · {state.progression.lifetimeHabitCompletions} Rituals
+          Local Storage · {state.progression.lifetimeCompletedTasks} Tasks · {state.progression.lifetimeHabitCompletions} Habits
         </div>
       </footer>
     </main>
