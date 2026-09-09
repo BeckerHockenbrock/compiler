@@ -18,6 +18,15 @@ export interface CreateTaskInput {
   readonly dueDate?: string;
 }
 
+export interface UpdateTaskInput {
+  readonly title?: string;
+  readonly priority?: TaskPriority;
+  readonly xpReward?: number;
+  readonly statRewards?: Readonly<Record<string, number>>;
+  readonly notes?: string;
+  readonly dueDate?: string;
+}
+
 export interface CompleteTaskResult {
   readonly nextState: AppState;
   readonly taskCompleted: boolean;
@@ -56,6 +65,68 @@ export function createTask(
       tasks: [newTask, ...currentState.tasks],
     },
     task: newTask,
+  };
+}
+
+/**
+ * Updates an existing pending task.
+ * Completed tasks cannot be edited to preserve progression history and integrity.
+ */
+export function updateTask(
+  currentState: AppState,
+  taskId: string,
+  updates: UpdateTaskInput
+): { nextState: AppState; taskUpdated: boolean; updatedTask?: Task } {
+  const targetTask = currentState.tasks.find((t) => t.id === taskId);
+
+  if (!targetTask || targetTask.status === "completed") {
+    return { nextState: currentState, taskUpdated: false };
+  }
+
+  const timestamp = nowUtc();
+  const updatedTask: Task = {
+    ...targetTask,
+    title: updates.title !== undefined ? updates.title.trim() || targetTask.title : targetTask.title,
+    notes: updates.notes !== undefined ? updates.notes.trim() || undefined : targetTask.notes,
+    priority: updates.priority ?? targetTask.priority,
+    dueDate: updates.dueDate !== undefined ? updates.dueDate || undefined : targetTask.dueDate,
+    xpReward: updates.xpReward !== undefined ? Math.max(0, Math.floor(updates.xpReward)) : targetTask.xpReward,
+    statRewards: updates.statRewards ? { ...updates.statRewards } : targetTask.statRewards,
+    updatedAt: timestamp,
+  };
+
+  const nextTasks = currentState.tasks.map((t) => (t.id === taskId ? updatedTask : t));
+
+  return {
+    nextState: {
+      ...currentState,
+      tasks: nextTasks,
+    },
+    taskUpdated: true,
+    updatedTask,
+  };
+}
+
+/**
+ * Explicitly deletes an existing pending task.
+ * Completed tasks cannot be deleted to preserve progression history and audit integrity.
+ */
+export function deleteTask(
+  currentState: AppState,
+  taskId: string
+): { nextState: AppState; taskDeleted: boolean } {
+  const targetTask = currentState.tasks.find((t) => t.id === taskId);
+
+  if (!targetTask || targetTask.status === "completed") {
+    return { nextState: currentState, taskDeleted: false };
+  }
+
+  return {
+    nextState: {
+      ...currentState,
+      tasks: currentState.tasks.filter((t) => t.id !== taskId),
+    },
+    taskDeleted: true,
   };
 }
 

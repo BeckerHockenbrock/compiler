@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createTask, completeTask } from "@/domain/tasks";
+import { createTask, completeTask, updateTask, deleteTask } from "@/domain/tasks";
 import { createInitialAppState } from "@/domain/defaults";
 
 describe("Domain: Task Operations & Idempotency", () => {
@@ -11,6 +11,7 @@ describe("Domain: Task Operations & Idempotency", () => {
       xpReward: 120,
       statRewards: { discipline: 15, knowledge: 10 },
       notes: "Implement tokenizer in TypeScript",
+      dueDate: "2026-09-15",
     });
 
     expect(task.title).toBe("Write compiler lexer");
@@ -18,10 +19,87 @@ describe("Domain: Task Operations & Idempotency", () => {
     expect(task.priority).toBe("urgent");
     expect(task.xpReward).toBe(120);
     expect(task.statRewards.discipline).toBe(15);
+    expect(task.dueDate).toBe("2026-09-15");
     expect(task.createdAt).toBeDefined();
 
     expect(nextState.tasks.length).toBe(state.tasks.length + 1);
     expect(nextState.tasks[0].id).toBe(task.id);
+  });
+
+  it("updates an existing pending task", () => {
+    const state = createInitialAppState();
+    const { nextState, task } = createTask(state, {
+      title: "Draft architecture",
+      priority: "low",
+      xpReward: 25,
+    });
+
+    const updateResult = updateTask(nextState, task.id, {
+      title: "Finalize architecture",
+      priority: "high",
+      xpReward: 100,
+      dueDate: "2026-09-20",
+    });
+
+    expect(updateResult.taskUpdated).toBe(true);
+    expect(updateResult.updatedTask?.title).toBe("Finalize architecture");
+    expect(updateResult.updatedTask?.priority).toBe("high");
+    expect(updateResult.updatedTask?.xpReward).toBe(100);
+    expect(updateResult.updatedTask?.dueDate).toBe("2026-09-20");
+
+    const found = updateResult.nextState.tasks.find((t) => t.id === task.id);
+    expect(found?.title).toBe("Finalize architecture");
+  });
+
+  it("refuses to update completed tasks to preserve audit history", () => {
+    const state = createInitialAppState();
+    const { nextState, task } = createTask(state, {
+      title: "Completed mission",
+      priority: "medium",
+      xpReward: 50,
+    });
+
+    const completion = completeTask(nextState, task.id);
+    expect(completion.taskCompleted).toBe(true);
+
+    const updateAttempt = updateTask(completion.nextState, task.id, {
+      title: "Attempt to modify completed task",
+    });
+
+    expect(updateAttempt.taskUpdated).toBe(false);
+    const unchanged = updateAttempt.nextState.tasks.find((t) => t.id === task.id);
+    expect(unchanged?.title).toBe("Completed mission");
+  });
+
+  it("deletes a pending task explicitly", () => {
+    const state = createInitialAppState();
+    const { nextState, task } = createTask(state, {
+      title: "Temporary quest",
+      priority: "low",
+      xpReward: 25,
+    });
+
+    expect(nextState.tasks.some((t) => t.id === task.id)).toBe(true);
+
+    const deleteResult = deleteTask(nextState, task.id);
+    expect(deleteResult.taskDeleted).toBe(true);
+    expect(deleteResult.nextState.tasks.some((t) => t.id === task.id)).toBe(false);
+  });
+
+  it("refuses to delete completed tasks to preserve audit history and totals", () => {
+    const state = createInitialAppState();
+    const { nextState, task } = createTask(state, {
+      title: "Permanent milestone",
+      priority: "high",
+      xpReward: 100,
+    });
+
+    const completion = completeTask(nextState, task.id);
+    expect(completion.taskCompleted).toBe(true);
+
+    const deleteAttempt = deleteTask(completion.nextState, task.id);
+    expect(deleteAttempt.taskDeleted).toBe(false);
+    expect(deleteAttempt.nextState.tasks.some((t) => t.id === task.id)).toBe(true);
   });
 
   it("completes a pending task and applies progression and stat rewards", () => {
