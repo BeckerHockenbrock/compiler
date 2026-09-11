@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
+    "app": "node scripts/launch-window.mjs studio",
+    "app:phone": "node scripts/launch-window.mjs phone",
+    "test:env": "next dev",
     "build": "next build",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

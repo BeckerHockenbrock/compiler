@@ -24,11 +24,25 @@ Detailed architectural specifications, layer contracts, and non-goals are docume
 npm install
 ```
 
-### Development Server
-Starts the Next.js local development server:
+### Standalone Window Launchers (No "localhost" Bar)
+Run the application in a dedicated, chromeless macOS window without address bars or tabs:
+```bash
+# 1. Dedicated iPhone 17 Pro Phone Window (Simulator style)
+npm run app:phone
+
+# 2. Dedicated iPhone 17 Pro Studio Window (Full workbench with controls)
+npm run app
+```
+
+### Standard Development Server
 ```bash
 npm run dev
+# or
+npm run test:env
 ```
+- **Desktop/Laptop**: Automatically opens the photorealistic **iPhone 17 Pro Studio** with titanium chassis, Dynamic Island, iOS 18/19 status bar, Home Indicator, safe-area visualizer, and developer tools (quick demo data seeder, +100 XP trigger, and storage reset).
+- **Mobile Devices**: Automatically runs full-screen native mobile web app.
+- **Direct View**: Click "Direct View" in the studio toolbar anytime to switch to direct responsive browser mode.
 
 ### Static Production Build
 Compiles the static export into the `./out` directory:

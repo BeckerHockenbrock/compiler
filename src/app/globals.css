@@ -1354,3 +1354,990 @@ html, body {
   font-size: 0.68rem;
   color: var(--text-dim);
 }
+
+/* ------------------------------------------------------------------ */
+/* iPhone 17 Pro Studio & Web App Local Test Environment              */
+/* ------------------------------------------------------------------ */
+
+.emulator-workbench-container {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: #07090e;
+  color: #f1f3f6;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  user-select: none;
+}
+
+/* Workbench Top Control Bar */
+.emulator-toolbar {
+  height: 54px;
+  min-height: 54px;
+  background: rgba(13, 16, 24, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  gap: 14px;
+  z-index: 120;
+}
+
+.toolbar-brand-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.toolbar-brand-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 700;
+  font-size: 0.94rem;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+}
+
+.apple-logo-icon {
+  font-size: 1.15rem;
+  line-height: 1;
+  color: #ffffff;
+  opacity: 0.9;
+}
+
+.toolbar-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toolbar-badge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #9aa2ae;
+}
+
+.toolbar-badge.active {
+  background: rgba(0, 144, 255, 0.15);
+  border-color: rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
+}
+
+.toolbar-badge.specs {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.toolbar-control-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.control-section-label {
+  font-size: 0.75rem;
+  color: #656d78;
+  font-weight: 600;
+}
+
+/* Mode Pill Switcher */
+.pill-group {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9999px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.pill-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #9aa2ae;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pill-btn:hover {
+  color: #ffffff;
+}
+
+.pill-btn.active {
+  background: rgba(0, 144, 255, 0.22);
+  border-color: rgba(56, 189, 248, 0.45);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 144, 255, 0.3);
+}
+
+/* Titanium Color Picker */
+.finish-color-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 4px 6px;
+  border-radius: 9999px;
+}
+
+.finish-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.finish-dot:hover {
+  transform: scale(1.15);
+}
+
+.finish-dot.active {
+  border-color: #38bdf8;
+  transform: scale(1.2);
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+}
+
+.finish-dot.natural {
+  background: linear-gradient(135deg, #9a9b9e 0%, #68696c 100%);
+}
+
+.finish-dot.black {
+  background: linear-gradient(135deg, #38393e 0%, #151618 100%);
+}
+
+.finish-dot.desert {
+  background: linear-gradient(135deg, #c4b3a1 0%, #7d6e60 100%);
+}
+
+.finish-dot.white {
+  background: linear-gradient(135deg, #ffffff 0%, #babdc4 100%);
+}
+
+/* Scale & Rotate */
+.scale-selector {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.scale-btn {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 5px 8px;
+  background: transparent;
+  border: none;
+  color: #9aa2ae;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.scale-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.scale-btn.active {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+/* Generic Tool Button */
+.tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #f1f3f6;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tool-btn:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.tool-btn.icon-only {
+  padding: 6px 8px;
+}
+
+.tool-btn.highlight {
+  background: rgba(0, 144, 255, 0.16);
+  border-color: rgba(0, 144, 255, 0.35);
+  color: #38bdf8;
+}
+
+.tool-btn.highlight:hover {
+  background: rgba(0, 144, 255, 0.26);
+  box-shadow: 0 0 12px rgba(0, 144, 255, 0.35);
+}
+
+.tool-btn.active-accent {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+  color: #ffffff;
+}
+
+.tool-btn.danger {
+  color: #f87171;
+}
+
+.tool-btn.danger:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.tool-btn.exit-btn {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Notification Toast */
+.emulator-toast-notice {
+  position: absolute;
+  top: 68px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(16, 20, 30, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), 0 0 20px rgba(0, 144, 255, 0.25);
+  z-index: 150;
+  animation: toastFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.toast-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 0 8px #38bdf8;
+}
+
+@keyframes toastFadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* Emulation Stage */
+.emulator-stage {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 16px;
+}
+
+.emulator-stage-background-glow {
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 144, 255, 0.07) 0%, rgba(0, 0, 0, 0) 70%);
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* iPhone 17 Pro Photorealistic Chassis & Shell                       */
+/* ------------------------------------------------------------------ */
+
+.iphone-frame-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.iphone-chassis {
+  position: relative;
+  border-radius: 56px;
+  padding: 12px;
+  box-shadow:
+    0 35px 90px rgba(0, 0, 0, 0.85),
+    0 0 0 1px rgba(255, 255, 255, 0.12),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.6);
+  transition: all 0.3s ease;
+}
+
+.iphone-chassis.orientation-portrait {
+  width: 426px;
+  height: 898px;
+}
+
+.iphone-chassis.orientation-landscape {
+  width: 898px;
+  height: 426px;
+}
+
+/* Titanium Finishes */
+.iphone-chassis.finish-natural {
+  background: linear-gradient(135deg, #7b7d81 0%, #a4a6aa 30%, #5d5f63 70%, #87898e 100%);
+}
+
+.iphone-chassis.finish-black {
+  background: linear-gradient(135deg, #242528 0%, #3e3f44 30%, #151619 70%, #2f3036 100%);
+}
+
+.iphone-chassis.finish-desert {
+  background: linear-gradient(135deg, #918070 0%, #bead9c 30%, #6c5c4e 70%, #a49281 100%);
+}
+
+.iphone-chassis.finish-white {
+  background: linear-gradient(135deg, #b0b2b8 0%, #e9ebf0 30%, #9ba0a6 70%, #d6d8df 100%);
+}
+
+/* Chassis Hardware Buttons (Titanium) */
+.btn-action-button {
+  position: absolute;
+  top: 130px;
+  left: -4px;
+  width: 4px;
+  height: 28px;
+  border-radius: 2px 0 0 2px;
+  background: inherit;
+  filter: brightness(1.1);
+  box-shadow: inset 1px 0 1px rgba(255, 255, 255, 0.4);
+}
+
+.btn-volume-up {
+  position: absolute;
+  top: 175px;
+  left: -4px;
+  width: 4px;
+  height: 52px;
+  border-radius: 2px 0 0 2px;
+  background: inherit;
+  filter: brightness(1.1);
+  box-shadow: inset 1px 0 1px rgba(255, 255, 255, 0.4);
+}
+
+.btn-volume-down {
+  position: absolute;
+  top: 240px;
+  left: -4px;
+  width: 4px;
+  height: 52px;
+  border-radius: 2px 0 0 2px;
+  background: inherit;
+  filter: brightness(1.1);
+  box-shadow: inset 1px 0 1px rgba(255, 255, 255, 0.4);
+}
+
+.btn-side-power {
+  position: absolute;
+  top: 195px;
+  right: -4px;
+  width: 4px;
+  height: 76px;
+  border-radius: 0 2px 2px 0;
+  background: inherit;
+  filter: brightness(1.1);
+  box-shadow: inset -1px 0 1px rgba(255, 255, 255, 0.4);
+}
+
+.btn-camera-control {
+  position: absolute;
+  top: 610px;
+  right: -3px;
+  width: 3px;
+  height: 58px;
+  border-radius: 0 2px 2px 0;
+  background: #18191c;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.9);
+}
+
+/* Ear Speaker Slit */
+.ear-speaker-slit {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 48px;
+  height: 3.5px;
+  border-radius: 4px;
+  background: #000000;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.15);
+  z-index: 110;
+}
+
+/* OLED Screen Display (402 × 874 pt) */
+.iphone-screen {
+  position: relative;
+  width: 402px;
+  height: 874px;
+  background: #08090c;
+  border-radius: 44px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.orientation-landscape .iphone-screen {
+  width: 874px;
+  height: 402px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Dynamic Island                                                     */
+/* ------------------------------------------------------------------ */
+
+.dynamic-island {
+  position: absolute;
+  top: 11px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 126px;
+  height: 37px;
+  border-radius: 20px;
+  background: #000000;
+  z-index: 110;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.dynamic-island:hover {
+  transform: translateX(-50%) scale(1.03);
+}
+
+.dynamic-island.expanded {
+  width: 320px;
+  height: 60px;
+  border-radius: 30px;
+  padding: 0 16px;
+  background: #0c0e14;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.9), 0 0 16px rgba(0, 144, 255, 0.2);
+}
+
+.island-compact-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.island-camera-lens {
+  position: relative;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #2a2d38 0%, #0d0f14 100%);
+  border: 1px solid #1f222d;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lens-reflection {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(120, 140, 255, 0.6);
+  filter: blur(0.5px);
+}
+
+.island-truedepth-sensor {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #111319;
+  border: 1px solid #1c1e28;
+}
+
+.island-expanded-content {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.island-app-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #f1f3f6;
+}
+
+.island-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 0 6px #38bdf8;
+}
+
+.island-status-pill {
+  font-size: 0.72rem;
+  color: #38bdf8;
+  background: rgba(0, 144, 255, 0.16);
+  padding: 3px 8px;
+  border-radius: 9999px;
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------------ */
+/* iOS 18/19 Status Bar                                               */
+/* ------------------------------------------------------------------ */
+
+.ios-status-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 54px;
+  z-index: 105;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 15px 28px 0 28px;
+  pointer-events: none;
+  color: #ffffff;
+}
+
+.status-time {
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+.status-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.status-icon {
+  color: #ffffff;
+}
+
+.status-5g-badge {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+}
+
+.status-battery-container {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.battery-pct-text {
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.status-battery-shell {
+  width: 22px;
+  height: 11.5px;
+  border-radius: 3px;
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  padding: 1px;
+  display: flex;
+  align-items: center;
+}
+
+.battery-level-fill {
+  height: 100%;
+  background: #ffffff;
+  border-radius: 1px;
+}
+
+.battery-terminal-bump {
+  width: 1.5px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 0 1px 1px 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Safe Area Debug Overlay                                            */
+/* ------------------------------------------------------------------ */
+
+.safe-area-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 108;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.safe-area-top-guide {
+  height: 59px;
+  border-bottom: 2px dashed #00f0ff;
+  background: rgba(0, 240, 255, 0.08);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 2px;
+}
+
+.safe-area-bottom-guide {
+  height: 34px;
+  border-top: 2px dashed #ff0077;
+  background: rgba(255, 0, 119, 0.08);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 2px;
+}
+
+.safe-area-tag {
+  font-size: 10px;
+  font-weight: 700;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 1px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+}
+
+/* ------------------------------------------------------------------ */
+/* Inner Viewport Content & IFrame                                    */
+/* ------------------------------------------------------------------ */
+
+.iphone-viewport-content {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.iphone-viewport-content.with-safari-chrome {
+  height: calc(100% - 78px);
+}
+
+.emulator-app-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  display: block;
+}
+
+/* ------------------------------------------------------------------ */
+/* iOS Home Indicator                                                 */
+/* ------------------------------------------------------------------ */
+
+.ios-home-indicator-container {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 110;
+  pointer-events: none;
+}
+
+.ios-home-indicator-bar {
+  width: 134px;
+  height: 5px;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, 0.65);
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
+}
+
+/* ------------------------------------------------------------------ */
+/* Safari Bottom Navigation & Address Pill                            */
+/* ------------------------------------------------------------------ */
+
+.safari-bottom-bar {
+  position: absolute;
+  bottom: 20px;
+  left: 0;
+  right: 0;
+  height: 78px;
+  z-index: 105;
+  background: rgba(18, 22, 32, 0.94);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 6px 14px 4px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.safari-address-pill {
+  height: 38px;
+  background: rgba(30, 36, 50, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+}
+
+.safari-btn-icon {
+  background: transparent;
+  border: none;
+  color: #9aa2ae;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+
+.safari-btn-icon:hover {
+  color: #ffffff;
+}
+
+.safari-url-display {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #f1f3f6;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.safari-url-text {
+  font-size: 0.78rem;
+  letter-spacing: -0.01em;
+}
+
+.safari-nav-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding-top: 2px;
+}
+
+.safari-toolbar-btn {
+  background: transparent;
+  border: none;
+  color: #38bdf8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+}
+
+.safari-toolbar-btn:disabled {
+  color: #485160;
+  cursor: default;
+}
+
+/* ------------------------------------------------------------------ */
+/* Workbench Footer                                                   */
+/* ------------------------------------------------------------------ */
+
+.emulator-footer {
+  height: 32px;
+  min-height: 32px;
+  background: rgba(11, 14, 20, 0.95);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  gap: 20px;
+  font-size: 0.72rem;
+  z-index: 100;
+}
+
+.footer-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.footer-label {
+  color: #656d78;
+  font-weight: 600;
+}
+
+.footer-val {
+  color: #9aa2ae;
+  font-weight: 500;
+}
+
+.footer-item.push-right {
+  margin-left: auto;
+}
+
+/* Floating Switcher in Direct View */
+.floating-emulator-toggle-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: rgba(16, 22, 34, 0.92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: 9999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), 0 0 20px rgba(0, 144, 255, 0.25);
+  z-index: 999;
+  transition: all 0.2s ease;
+}
+
+.floating-emulator-toggle-btn:hover {
+  background: rgba(0, 144, 255, 0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.8), 0 0 24px rgba(0, 144, 255, 0.4);
+}
+
+/* Phone Only Standalone Window View */
+.phone-only-standalone-container {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #06070a;
+  overflow: hidden;
+}
+
+/* ------------------------------------------------------------------ */
+/* Computer View Top Bar & Return Action                              */
+/* ------------------------------------------------------------------ */
+
+.direct-view-wrapper {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-main);
+  position: relative;
+}
+
+.direct-view-top-bar {
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 52px;
+  background: rgba(12, 16, 25, 0.96);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-bottom: 1px solid rgba(56, 189, 248, 0.4);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.7), 0 0 16px rgba(0, 144, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  z-index: 200;
+}
+
+.direct-view-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.direct-view-badge {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: -0.01em;
+}
+
+.direct-view-subtext {
+  font-size: 0.75rem;
+  color: #9aa2ae;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 8px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 640px) {
+  .direct-view-subtext {
+    display: none;
+  }
+}
+
+.btn-return-to-iphone {
+  background: linear-gradient(135deg, #0090ff 0%, #0066cc 100%);
+  color: #ffffff;
+  border: 1px solid #38bdf8;
+  border-radius: 9999px;
+  padding: 7px 18px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 0 16px rgba(0, 144, 255, 0.45);
+  transition: all 0.16s ease;
+}
+
+.btn-return-to-iphone:hover {
+  background: linear-gradient(135deg, #25a0ff 0%, #0077ee 100%);
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: 0 0 24px rgba(56, 189, 248, 0.65);
+}
+
+.btn-return-to-iphone:active {
+  transform: translateY(0) scale(0.99);
+}
+
+.return-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.direct-view-content {
+  flex: 1;
+}

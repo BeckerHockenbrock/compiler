@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useId } from "react";
+import { useState, useEffect, useId } from "react";
 import { useAppStore } from "@/hooks/use-app-store";
+import { EmulatorWorkbench } from "@/components/emulator/emulator-workbench";
+import { IPhoneFrame } from "@/components/emulator/iphone-frame";
 import type { Task, TaskPriority } from "@/domain/types";
 import { toLocalDate, nowUtc } from "@/domain/date-time";
 import { RankBadge } from "@/components/rank-badge";
@@ -218,7 +220,7 @@ function ProgressionRadarChart({ entries }: RadarChartProps) {
 /* Main Application Dashboard                                         */
 /* ------------------------------------------------------------------ */
 
-export default function HomeDashboard() {
+function HomeDashboard({ isEmbedded = false }: { isEmbedded?: boolean } = {}) {
   const {
     state,
     isHydrated,
@@ -404,7 +406,7 @@ export default function HomeDashboard() {
 
   if (!isHydrated) {
     return (
-      <main className="app-viewport" style={{ justifyContent: "center", alignItems: "center" }}>
+      <main className={`app-viewport ${isEmbedded ? "is-embedded" : ""}`} style={{ justifyContent: "center", alignItems: "center" }}>
         <h1 className="sr-only">Personal Focus & Progression Dashboard</h1>
         <div style={{ color: "var(--text-muted)", fontSize: "0.88rem" }}>
           Loading workspace...
@@ -415,7 +417,7 @@ export default function HomeDashboard() {
 
   if (error) {
     return (
-      <main className="app-viewport" style={{ justifyContent: "center" }}>
+      <main className={`app-viewport ${isEmbedded ? "is-embedded" : ""}`} style={{ justifyContent: "center" }}>
         <h1 className="sr-only">Personal Focus & Progression Dashboard</h1>
         <div className="hero-card" style={{ textAlign: "center" }}>
           <h2 style={{ color: "var(--status-danger-text)", marginBottom: "8px", fontSize: "1.1rem" }}>
@@ -443,7 +445,7 @@ export default function HomeDashboard() {
   });
 
   return (
-    <main className="app-viewport">
+    <main className={`app-viewport ${isEmbedded ? "is-embedded" : ""}`}>
       {/* Visually hidden primary heading for accessible document outline */}
       <h1 className="sr-only">Personal Focus & Progression Dashboard</h1>
 
@@ -1591,3 +1593,150 @@ export default function HomeDashboard() {
     </main>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* Root Page Router (iPhone 17 Pro Studio vs Direct Responsive View)   */
+/* ------------------------------------------------------------------ */
+
+export default function Page() {
+  const [isMounted, setIsMounted] = useState(false);
+  const [isEmbedded, setIsEmbedded] = useState(false);
+  const [isPhoneOnly, setIsPhoneOnly] = useState(false);
+  const [isLocalHost, setIsLocalHost] = useState(false);
+  const [forceDirect, setForceDirect] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(true);
+
+  useEffect(() => {
+    setIsMounted(true);
+    const searchParams = new URLSearchParams(window.location.search);
+    const embedded =
+      searchParams.get("view") === "app" ||
+      searchParams.get("embedded") === "true";
+    setIsEmbedded(embedded);
+
+    const phoneOnly = searchParams.get("phone_only") === "true";
+    setIsPhoneOnly(phoneOnly);
+
+    // Only activate the iPhone emulator shell on local development environments
+    // (localhost, 127.0.0.1, 0.0.0.0) or if explicitly requested via ?emulator=true.
+    // The actual live production website runs natively without the emulator.
+    const isLocal =
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1" ||
+      window.location.hostname === "0.0.0.0" ||
+      window.location.hostname === "" ||
+      searchParams.get("emulator") === "true";
+    setIsLocalHost(isLocal);
+
+    const storedDirect = localStorage.getItem("emulator_disabled") === "true";
+    setForceDirect(storedDirect);
+
+    const checkDesktop = () => {
+      setIsDesktop(window.innerWidth >= 768);
+    };
+    checkDesktop();
+    window.addEventListener("resize", checkDesktop);
+    return () => window.removeEventListener("resize", checkDesktop);
+  }, []);
+
+  // Keyboard shortcut: Press Escape in Computer View to return to iPhone Studio
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && forceDirect) {
+        localStorage.removeItem("emulator_disabled");
+        setForceDirect(false);
+        setIsPhoneOnly(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [forceDirect]);
+
+  if (!isMounted) {
+    return <HomeDashboard isEmbedded={false} />;
+  }
+
+  // Inside the emulator iframe: render pure isolated web app
+  if (isEmbedded) {
+    return <HomeDashboard isEmbedded={true} />;
+  }
+
+  // On the actual live production website, render the native application directly.
+  // The iPhone 17 Pro test environment only displays when running locally.
+  if (!isLocalHost) {
+    return <HomeDashboard isEmbedded={false} />;
+  }
+
+  // Standalone Phone-Only Window View (local test environment)
+  if (isPhoneOnly) {
+    return (
+      <div className="phone-only-standalone-container">
+        <IPhoneFrame finish="natural" displayMode="standalone" scale={1}>
+          <iframe
+            src="/?view=app"
+            title="Personal Progression App"
+            className="emulator-app-iframe"
+          />
+        </IPhoneFrame>
+      </div>
+    );
+  }
+
+  // Computer / Direct Responsive View (when user toggled out of emulator, or on mobile)
+  if (forceDirect || !isDesktop) {
+    const handleSwitchToEmulator = () => {
+      localStorage.removeItem("emulator_disabled");
+      setForceDirect(false);
+      setIsPhoneOnly(false);
+      if (window.location.search.includes("phone_only") || window.location.search.includes("emulator_disabled")) {
+        window.history.replaceState({}, "", "/");
+      }
+    };
+
+    return (
+      <div className="direct-view-wrapper">
+        {/* Unmissable Top Control Bar */}
+        <header className="direct-view-top-bar" role="banner">
+          <div className="direct-view-info">
+            <span className="direct-view-badge">🖥️ Computer View</span>
+            <span className="direct-view-subtext">Desktop Responsive Mode • Press Esc to switch back</span>
+          </div>
+          <button
+            type="button"
+            className="btn-return-to-iphone"
+            onClick={handleSwitchToEmulator}
+            title="Switch back to iPhone 17 Pro Studio (or press Esc)"
+          >
+            <span className="return-icon">📱</span>
+            <span className="return-text">Back to iPhone 17 Pro Studio</span>
+          </button>
+        </header>
+
+        <div className="direct-view-content">
+          <HomeDashboard isEmbedded={false} />
+        </div>
+
+        {/* Persistent Floating Button at bottom right as well */}
+        <button
+          type="button"
+          className="floating-emulator-toggle-btn"
+          onClick={handleSwitchToEmulator}
+          title="Switch back to iPhone 17 Pro Studio"
+        >
+          <span>📱</span>
+          <span>Back to iPhone 17 Pro</span>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <EmulatorWorkbench
+      onExitToDirectView={() => {
+        localStorage.setItem("emulator_disabled", "true");
+        setForceDirect(true);
+      }}
+    />
+  );
+}
+
