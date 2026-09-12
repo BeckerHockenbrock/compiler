@@ -7,6 +7,7 @@ import { IPhoneFrame } from "@/components/emulator/iphone-frame";
 import type { Task, TaskPriority } from "@/domain/types";
 import { toLocalDate, nowUtc } from "@/domain/date-time";
 import { RankBadge } from "@/components/rank-badge";
+import { StudyTimer } from "@/components/study-timer";
 import {
   formatRankLabel,
   getDaysRemainingInSeason,
@@ -221,6 +222,7 @@ function ProgressionRadarChart({ entries }: RadarChartProps) {
 /* ------------------------------------------------------------------ */
 
 function HomeDashboard({ isEmbedded = false }: { isEmbedded?: boolean } = {}) {
+  const appStore = useAppStore();
   const {
     state,
     isHydrated,
@@ -239,7 +241,14 @@ function HomeDashboard({ isEmbedded = false }: { isEmbedded?: boolean } = {}) {
     exportData,
     importData,
     resetDefaults,
-  } = useAppStore();
+    startTimer,
+    pauseTimer,
+    resumeTimer,
+    cancelTimer,
+    reconcileTimer,
+    lastCompletedSession,
+    clearCompletionSummary,
+  } = appStore;
 
   const [activeTab, setActiveTab] = useState<ActiveTab>("home");
 
@@ -516,10 +525,28 @@ function HomeDashboard({ isEmbedded = false }: { isEmbedded?: boolean } = {}) {
               </div>
               <div className="focus-metric-item">
                 <span className="focus-metric-label">Focus Session</span>
-                <span className="focus-metric-val" style={{ fontSize: "0.85rem", color: "var(--accent-blue-bright)" }}>Ready</span>
+                <span className="focus-metric-val" style={{ fontSize: "0.85rem", color: "var(--accent-blue-bright)" }}>
+                  {state.studyTimer.status === "running"
+                    ? "Active"
+                    : state.studyTimer.status === "paused"
+                    ? "Paused"
+                    : "Ready"}
+                </span>
               </div>
             </div>
           </section>
+
+          {/* Local-First Study Timer */}
+          <StudyTimer
+            state={state}
+            startTimer={startTimer}
+            pauseTimer={pauseTimer}
+            resumeTimer={resumeTimer}
+            cancelTimer={cancelTimer}
+            reconcileTimer={reconcileTimer}
+            lastCompletedSession={lastCompletedSession}
+            clearCompletionSummary={clearCompletionSummary}
+          />
 
           {/* Compact Season Rank Card */}
           <section className="season-card" aria-label="Season Rank Overview">

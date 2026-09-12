@@ -12,6 +12,7 @@ import { CURRENT_SCHEMA_VERSION } from "@/storage/schema";
 import { DEFAULT_STAT_DEFINITIONS } from "@/domain/defaults";
 import { nowUtc } from "@/domain/date-time";
 import { createInitialSeasonRankState } from "@/domain/season-rank";
+import { createInitialStudyTimerState } from "@/domain/study-timer";
 
 export function createDemoAppState(): AppState {
   const now = nowUtc();
@@ -211,6 +212,7 @@ export function createDemoAppState(): AppState {
       dailyResetHour: 4,
       maxLogRetention: 100,
     },
+    studyTimer: createInitialStudyTimerState(),
   };
 }
 

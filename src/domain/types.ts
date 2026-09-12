@@ -67,7 +67,7 @@ export interface Habit {
 
 export interface ActivityLog {
   readonly id: string;
-  readonly type: "task" | "habit" | "manual";
+  readonly type: "task" | "habit" | "manual" | "focus";
   readonly referenceId?: string;
   readonly title: string;
   /** ISO 8601 UTC timestamp */
@@ -192,6 +192,42 @@ export interface SeasonRankState {
   readonly previousSeasonSummary?: PreviousSeasonSummary;
 }
 
+/* ------------------------------------------------------------------ */
+/* Study Timer                                                        */
+/* ------------------------------------------------------------------ */
+
+export type StudyTimerStatus = "idle" | "running" | "paused";
+
+export type StudyTimerDurationMinutes = 25 | 50 | 75;
+
+export type StudyTimerActionResult = "normal" | "completed" | "noop";
+
+export interface StudyTimerState {
+  readonly status: StudyTimerStatus;
+  readonly sessionId: string | null;
+  readonly durationMinutes: StudyTimerDurationMinutes;
+  /** UTC ISO 8601 timestamp for active running segment, null if idle/paused */
+  readonly segmentStartedAt: string | null;
+  /** Accumulated elapsed milliseconds across previous paused segments */
+  readonly accumulatedElapsedMs: number;
+  /** Last completed session ID to guarantee completion idempotency */
+  readonly lastCompletedSessionId?: string | null;
+}
+
+export interface CompletedStudySessionSummary {
+  readonly sessionId: string;
+  readonly durationMinutes: StudyTimerDurationMinutes;
+  readonly completedAt: string;
+  readonly xpEarned: number;
+  readonly srEarned: number;
+  readonly statDeltas: Readonly<Record<string, number>>;
+  readonly levelUpOccurred: boolean;
+  readonly newLevel: number;
+  readonly promoted: boolean;
+  readonly newTier: RankTier;
+  readonly newDivision: RankDivision | null;
+}
+
 export interface AppState {
   readonly progression: UserProgression;
   readonly stats: Readonly<Record<string, StatValue>>;
@@ -202,12 +238,14 @@ export interface AppState {
   readonly activityLogs: readonly ActivityLog[];
   readonly settings: UserSettings;
   readonly seasonRank: SeasonRankState;
+  readonly studyTimer: StudyTimerState;
 }
 
 export interface ActivityReward {
   readonly xp: number;
   readonly statRewards: Readonly<Record<string, number>>;
   readonly title: string;
-  readonly type: "task" | "habit" | "manual";
+  readonly type: "task" | "habit" | "manual" | "focus";
   readonly referenceId?: string;
+  readonly timestamp?: string;
 }

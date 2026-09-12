@@ -7,7 +7,7 @@
 
 import { z } from "zod";
 
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 
 export const StatDefinitionSchema = z.object({
   id: z.string().min(1),
@@ -64,7 +64,7 @@ export const HabitSchema = z.object({
 
 export const ActivityLogSchema = z.object({
   id: z.string().min(1),
-  type: z.enum(["task", "habit", "manual"]),
+  type: z.enum(["task", "habit", "manual", "focus"]),
   referenceId: z.string().optional(),
   title: z.string().min(1),
   timestamp: z.string(),
@@ -168,6 +168,27 @@ export const SeasonRankStateSchema = z.object({
   previousSeasonSummary: PreviousSeasonSummarySchema.optional(),
 });
 
+/* ------------------------------------------------------------------ */
+/* Study Timer Schemas                                                */
+/* ------------------------------------------------------------------ */
+
+export const StudyTimerStatusSchema = z.enum(["idle", "running", "paused"]);
+
+export const StudyTimerDurationMinutesSchema = z.union([
+  z.literal(25),
+  z.literal(50),
+  z.literal(75),
+]);
+
+export const StudyTimerStateSchema = z.object({
+  status: StudyTimerStatusSchema,
+  sessionId: z.string().nullable(),
+  durationMinutes: StudyTimerDurationMinutesSchema,
+  segmentStartedAt: z.string().nullable(),
+  accumulatedElapsedMs: z.number().int().nonnegative(),
+  lastCompletedSessionId: z.string().nullable().optional(),
+});
+
 export const AppStateSchema = z.object({
   progression: UserProgressionSchema,
   stats: z.record(z.string(), StatValueSchema),
@@ -178,6 +199,7 @@ export const AppStateSchema = z.object({
   activityLogs: z.array(ActivityLogSchema),
   settings: UserSettingsSchema,
   seasonRank: SeasonRankStateSchema,
+  studyTimer: StudyTimerStateSchema,
 });
 
 export const StorageEnvelopeSchema = z.object({

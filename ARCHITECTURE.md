@@ -32,10 +32,15 @@ This document specifies the technical architecture, domain modeling principles, 
 │   │   ├── globals.css        # Theme variables, mobile-first responsive layout, and game HUD
 │   │   ├── layout.tsx         # Root layout (viewport, title, static shell)
 │   │   └── page.tsx           # Mobile-first dashboard (Quests, Rituals, Character, Vault)
+│   ├── components/            # Reusable UI components
+│   │   ├── rank-badge.tsx     # Accessible SVG rank tier badges
+│   │   └── study-timer.tsx    # Mobile-first local study timer card
 │   ├── domain/                # Pure domain layer (ZERO React/DOM/Storage dependencies)
 │   │   ├── types.ts           # Core domain entity types & interfaces
 │   │   ├── date-time.ts       # Strict ISO 8601 UTC & local calendar date logic
 │   │   ├── progression.ts     # XP formulas, level curves, and reward state transitions
+│   │   ├── season-rank.ts     # Monthly Ranked ladder, promotion trials, daily SR caps
+│   │   ├── study-timer.ts     # Pure study timer logic, timestamp derivation, focus rewards
 │   │   ├── streaks.ts         # Habit streak calculations evaluated on calendar days
 │   │   ├── tasks.ts           # Pure task creation, update, deletion, and idempotent completion
 │   │   ├── habits.ts          # Pure habit creation, deletion, and single daily check-in
@@ -45,18 +50,20 @@ This document specifies the technical architecture, domain modeling principles, 
 │   │   └── use-app-store.ts   # Client store linking StorageManager to UI with hydration safety
 │   ├── storage/               # Persistence, validation, migration & backup layer
 │   │   ├── types.ts           # StorageAdapter interface, StorageEnvelope, error types
-│   │   ├── schema.ts          # Zod validation schemas & CURRENT_SCHEMA_VERSION = 2
+│   │   ├── schema.ts          # Zod validation schemas & CURRENT_SCHEMA_VERSION = 3
 │   │   ├── checksum.ts        # Fast FNV-1a checksum for accidental-corruption detection
 │   │   ├── compaction.ts      # User-visible log retention & compaction (preserves aggregates)
 │   │   ├── migrations/        # Sequential in-memory migration runner
-│   │   │   └── index.ts       # Migration registry (transitions added only on version bumps)
+│   │   │   ├── index.ts       # Migration registry (transitions added only on version bumps)
+│   │   │   ├── v1-to-v2.ts    # Migration: attach Season Rank state
+│   │   │   └── v2-to-v3.ts    # Migration: attach Study Timer state
 │   │   ├── adapter.ts         # NamespacedLocalStorageAdapter (scoped keys, no localStorage.clear())
 │   │   ├── backup.ts          # Safe in-memory backup export and import pipeline
 │   │   └── storage-manager.ts # Storage coordinator, metric estimation, non-destructive recovery
 │   └── lib/                   # Shared utility primitives
 │       └── result.ts          # Type-safe Result<T, E> discriminated union
 ├── tests/                     # Vitest automated unit test suites
-│   ├── domain/                # Tests for progression, date-time, streaks, tasks, habits, skills
+│   ├── domain/                # Tests for progression, date-time, streaks, tasks, habits, skills, study timer
 │   └── storage/               # Tests for adapter, migrations, corrupt data, backup, compaction, persistence flow
 ├── ARCHITECTURE.md            # Architectural blueprint and specifications
 ├── README.md                  # Developer manual, backup runbook, and deployment guide
@@ -121,8 +128,8 @@ interface StorageEnvelope<T> {
   state: T;            // Validated AppState
 }
 ```
-- `CURRENT_SCHEMA_VERSION = 2` is defined in `src/storage/schema.ts`.
-- Migration files are introduced in `src/storage/migrations/` when a version transition (such as $1 \to 2$) occurs.
+- `CURRENT_SCHEMA_VERSION = 3` is defined in `src/storage/schema.ts`.
+- Migration files are introduced in `src/storage/migrations/` when a version transition (such as $1 \to 2$ or $2 \to 3$) occurs.
 
 ### Non-Destructive Corrupt State Handling
 If `personal_app:state` contains malformed JSON, fails Zod validation, or references an unsupported version:
@@ -328,7 +335,7 @@ Points (Season Rank points, SR) are earned strictly through intentional daily ef
 - **Daily task SR cap**: 25 SR per calendar day.
 - **Daily habit SR cap**: 10 SR per calendar day.
 - **Weekly Ranked Mission**: 25 SR (awarded upon completing 5 qualifying activities within the active ISO week `YYYY-Www`).
-- **Focus session extension point**: Designed for future timed focus blocks awarding 10 SR per completed 25-minute block, capped at 40 SR/day.
+- **Focus sessions**: Timed focus blocks awarding 10 SR per completed 25-minute block, capped at 40 SR/day.
 
 ### Division Progression & Promotion Trials
 - Each division requires 100 SR.
@@ -360,3 +367,44 @@ As a zero-server, static web application running entirely in the browser:
 - Storage and scheduling depend on the client machine's system clock.
 - A fully local web application cannot cryptographically prevent a user from manually altering their device clock.
 - This is an intentional, acceptable architectural reality: this application is a **private personal self-improvement workspace**, not a multi-tenant competitive public leaderboard with monetary stakes. Backward clock jumps are guarded gracefully in domain logic without data corruption or negative score generation.
+
+---
+
+## 11. Local Study Timer Architecture
+
+### Timestamp-Derived State Transitions
+To guarantee durability and precision in a zero-server static web application, the Study Timer deliberately avoids persisting per-second countdown counters to `localStorage`:
+- **State Fields**:
+  - `status`: `"idle" | "running" | "paused"`
+  - `sessionId`: Unique identifier for the active session, or `null` if idle
+  - `durationMinutes`: Selected preset (`25 | 50 | 75`)
+  - `segmentStartedAt`: UTC ISO 8601 timestamp marking the start of the active running segment, or `null` if idle/paused
+  - `accumulatedElapsedMs`: Total elapsed milliseconds accumulated across previously paused segments
+  - `lastCompletedSessionId`: Last recorded completed session ID to ensure completion idempotency
+- **Elapsed Time Derivation**: Elapsed and remaining time are derived purely from absolute wall-clock timestamps:
+  $$\text{totalElapsed} = \text{accumulatedElapsedMs} + (\text{nowUtc}() - \text{segmentStartedAt})$$
+- **Immunity to Drift and Throttling**: Tab switching, background tab throttling, OS sleep/wake, and page reloads have zero effect on countdown accuracy. When the user returns, the elapsed time is recomputed against the absolute device clock.
+- **Persistence Boundary**: `localStorage` writes occur solely upon meaningful state transitions: start, pause, resume, cancel, and completion. Zero I/O operations occur on periodic UI display ticks.
+
+### Idempotent Completion & Pre-Rollover Reconciliation
+- **Idempotency**: Completion is strictly idempotent. Repeated execution, rapid double clicks, or simultaneous focus/visibility events cannot double-credit XP, stats, logs, SR, or mission progress.
+- **Monthly Boundary Precedence**: Before completing an elapsed session, the system reconciles monthly rollover using the completion timestamp and configured timezone. A study session started at 23:45 on the final day of a month and finishing at 00:10 on the first day of the new month correctly attributes its Season Rank blocks to the new season, after the prior season has been safely archived.
+- **Cancellation**: Cancelled or partial sessions receive zero XP, stats, SR, or activity logs, returning cleanly to idle.
+
+### Rewards & Season Rank Scoring Boundary
+- **Duration Presets**: 25, 50, and 75 minutes, mapping strictly to 1, 2, and 3 completed 25-minute focus blocks.
+- **Permanent Rewards per 25-Minute Block**:
+  - Permanent XP: +25 XP
+  - Discipline: +2
+  - Knowledge: +3
+  - Focus: +3
+- **Permanent Activity Log**: Exactly one `ActivityLog` entry is appended per completed session with type `"focus"`, titled `Completed study session · <N> min`.
+- **Season Rank Integration**: Scored via the existing pure `applyActivityToSeasonRank(currentState, blockId, "focus", ...)` boundary once per 25-minute block with deterministic block IDs (`${sessionId}_block_${i}`). This enforces the existing +10 SR per block award and the 40 SR daily focus cap without duplication.
+
+### Migration Strategy (Schema v2 to v3)
+- Schema version is bumped from 2 to 3.
+- `migrateV2ToV3` attaches default idle `StudyTimerState` to prior states/backups without mutating existing XP, stats, tasks, habits, or seasonal history.
+- Upgrades execute in memory with automatic write-back on load.
+
+### Local Clock Limitation & Trust Boundary
+As with the seasonal rank system, the study timer relies on the client device's trusted system clock. While client-side clock alterations cannot be cryptographically prevented without a centralized server, backward clock jumps are guarded gracefully in domain logic (`Math.max(0, now - segmentStart)`), ensuring elapsed time never becomes negative or corrupts data.

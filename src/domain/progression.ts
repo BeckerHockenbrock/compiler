@@ -80,7 +80,7 @@ export function applyActivityReward(
     type: reward.type,
     referenceId: reward.referenceId,
     title: reward.title,
-    timestamp: nowUtc(),
+    timestamp: reward.timestamp ?? nowUtc(),
     xpEarned: earnedXp,
     statDeltas: { ...reward.statRewards },
   };

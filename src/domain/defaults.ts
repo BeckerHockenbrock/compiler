@@ -5,6 +5,7 @@
 import type { AppState, StatDefinition, Skill, Task, Habit } from "./types";
 import { nowUtc } from "./date-time";
 import { createInitialSeasonRankState } from "./season-rank";
+import { createInitialStudyTimerState } from "./study-timer";
 
 export const DEFAULT_STAT_DEFINITIONS: readonly StatDefinition[] = [
   {
@@ -131,5 +132,6 @@ export function createInitialAppState(): AppState {
         }
       })()
     ),
+    studyTimer: createInitialStudyTimerState(),
   };
 }

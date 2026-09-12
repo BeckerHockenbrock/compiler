@@ -8,7 +8,13 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import type { AppState, PromotionTrialStatus } from "@/domain/types";
+import type {
+  AppState,
+  PromotionTrialStatus,
+  StudyTimerDurationMinutes,
+  StudyTimerActionResult,
+  CompletedStudySessionSummary,
+} from "@/domain/types";
 import { calculateLevel, type LevelProgress } from "@/domain/progression";
 import {
   checkAndApplySeasonRollover,
@@ -16,6 +22,13 @@ import {
   findLadderIndex,
   getRankRung,
 } from "@/domain/season-rank";
+import {
+  reconcileStudyTimer,
+  startStudyTimerWithReconciliation,
+  pauseStudyTimerWithReconciliation,
+  resumeStudyTimerWithReconciliation,
+  cancelStudyTimerWithReconciliation,
+} from "@/domain/study-timer";
 import { toLocalDate, nowUtc } from "@/domain/date-time";
 import {
   createTask,
@@ -78,6 +91,15 @@ export interface UseAppStoreReturn {
   // Skill Actions
   readonly assignSkillPoint: (skillId: string) => AllocateSkillPointResult | null;
 
+  // Timer Actions
+  readonly startTimer: (durationMinutes: StudyTimerDurationMinutes) => StudyTimerActionResult;
+  readonly pauseTimer: () => StudyTimerActionResult;
+  readonly resumeTimer: () => StudyTimerActionResult;
+  readonly cancelTimer: () => StudyTimerActionResult;
+  readonly reconcileTimer: () => CompletedStudySessionSummary | null;
+  readonly lastCompletedSession: CompletedStudySessionSummary | null;
+  readonly clearCompletionSummary: () => void;
+
   // Data / Vault Actions
   readonly exportData: () => string | null;
   readonly importData: (jsonString: string, confirmOverwrite: boolean) => Result<AppState, StorageError>;
@@ -90,6 +112,11 @@ export function useAppStore(): UseAppStoreReturn {
   const [isHydrated, setIsHydrated] = useState(false);
   const [error, setError] = useState<StorageError | null>(null);
   const [metrics, setMetrics] = useState<EstimatedStorageMetrics | null>(null);
+  const [lastCompletedSession, setLastCompletedSession] = useState<CompletedStudySessionSummary | null>(null);
+
+  const clearCompletionSummary = useCallback(() => {
+    setLastCompletedSession(null);
+  }, []);
 
   const refreshMetrics = useCallback(() => {
     const { adapter } = getStorageInstances();
@@ -113,20 +140,50 @@ export function useAppStore(): UseAppStoreReturn {
     });
   }, []);
 
-  // Load state upon client mount to avoid SSR hydration mismatches and reconcile rollover
+  // Reconcile study timer completion safely
+  const reconcileTimer = useCallback((): CompletedStudySessionSummary | null => {
+    let completedSummary: CompletedStudySessionSummary | null = null;
+    setState((currentState) => {
+      if (!currentState) return currentState;
+      const { nextState, sessionCompleted, summary } = reconcileStudyTimer(currentState);
+      if (sessionCompleted && summary) {
+        completedSummary = summary;
+        setLastCompletedSession(summary);
+        const { manager } = getStorageInstances();
+        const saveRes = manager.saveState(nextState);
+        if (saveRes.ok) {
+          refreshMetrics();
+          return nextState;
+        } else {
+          setError(saveRes.error);
+          return currentState;
+        }
+      }
+      return currentState;
+    });
+    return completedSummary;
+  }, [refreshMetrics]);
+
+  // Load state upon client mount to avoid SSR hydration mismatches and reconcile rollover & timer
   useEffect(() => {
     const { manager } = getStorageInstances();
     const result = manager.loadState();
 
     if (result.ok) {
-      const loaded = result.data;
-      const { nextState, rolledOver } = checkAndApplySeasonRollover(loaded);
+      let effectiveState = result.data;
+      const { nextState: afterRollover, rolledOver } = checkAndApplySeasonRollover(effectiveState);
       if (rolledOver) {
-        manager.saveState(nextState);
-        setState(nextState);
-      } else {
-        setState(loaded);
+        effectiveState = afterRollover;
       }
+      const { nextState: afterTimer, sessionCompleted, summary } = reconcileStudyTimer(effectiveState);
+      if (sessionCompleted && summary) {
+        effectiveState = afterTimer;
+        setLastCompletedSession(summary);
+      }
+      if (rolledOver || sessionCompleted) {
+        manager.saveState(effectiveState);
+      }
+      setState(effectiveState);
       setError(null);
     } else {
       setError(result.error);
@@ -139,6 +196,7 @@ export function useAppStore(): UseAppStoreReturn {
   useEffect(() => {
     const handleReconcile = () => {
       reconcileRollover();
+      reconcileTimer();
     };
 
     window.addEventListener("focus", handleReconcile);
@@ -150,7 +208,7 @@ export function useAppStore(): UseAppStoreReturn {
       document.removeEventListener("visibilitychange", handleReconcile);
       clearInterval(interval);
     };
-  }, [reconcileRollover]);
+  }, [reconcileRollover, reconcileTimer]);
 
   // Compute current leveling progress derived from state
   const levelProgress = useMemo(() => {
@@ -425,6 +483,108 @@ export function useAppStore(): UseAppStoreReturn {
     }
   }, [refreshMetrics]);
 
+  // -------------------------------------------------------------
+  // Study Timer Actions
+  // -------------------------------------------------------------
+
+  const startTimer = useCallback(
+    (durationMinutes: StudyTimerDurationMinutes): StudyTimerActionResult => {
+      if (!state) return "noop";
+
+      const { nextState, result, summary } = startStudyTimerWithReconciliation(
+        state,
+        durationMinutes
+      );
+      if (result === "noop" && !summary) return "noop";
+
+      if (summary) {
+        setLastCompletedSession(summary);
+      }
+
+      const { manager } = getStorageInstances();
+      const saveRes = manager.saveState(nextState);
+
+      if (saveRes.ok) {
+        setState(nextState);
+        refreshMetrics();
+        return result;
+      } else {
+        setError(saveRes.error);
+        return "noop";
+      }
+    },
+    [state, refreshMetrics]
+  );
+
+  const pauseTimer = useCallback((): StudyTimerActionResult => {
+    if (!state) return "noop";
+
+    const { nextState, result, summary } = pauseStudyTimerWithReconciliation(state);
+    if (result === "noop") return "noop";
+
+    if (summary) {
+      setLastCompletedSession(summary);
+    }
+
+    const { manager } = getStorageInstances();
+    const saveRes = manager.saveState(nextState);
+
+    if (saveRes.ok) {
+      setState(nextState);
+      refreshMetrics();
+      return result;
+    } else {
+      setError(saveRes.error);
+      return "noop";
+    }
+  }, [state, refreshMetrics]);
+
+  const resumeTimer = useCallback((): StudyTimerActionResult => {
+    if (!state) return "noop";
+
+    const { nextState, result, summary } = resumeStudyTimerWithReconciliation(state);
+    if (result === "noop") return "noop";
+
+    if (summary) {
+      setLastCompletedSession(summary);
+    }
+
+    const { manager } = getStorageInstances();
+    const saveRes = manager.saveState(nextState);
+
+    if (saveRes.ok) {
+      setState(nextState);
+      refreshMetrics();
+      return result;
+    } else {
+      setError(saveRes.error);
+      return "noop";
+    }
+  }, [state, refreshMetrics]);
+
+  const cancelTimer = useCallback((): StudyTimerActionResult => {
+    if (!state) return "noop";
+
+    const { nextState, result, summary } = cancelStudyTimerWithReconciliation(state);
+    if (result === "noop") return "noop";
+
+    if (summary) {
+      setLastCompletedSession(summary);
+    }
+
+    const { manager } = getStorageInstances();
+    const saveRes = manager.saveState(nextState);
+
+    if (saveRes.ok) {
+      setState(nextState);
+      refreshMetrics();
+      return result;
+    } else {
+      setError(saveRes.error);
+      return "noop";
+    }
+  }, [state, refreshMetrics]);
+
   return {
     state,
     isHydrated,
@@ -433,6 +593,13 @@ export function useAppStore(): UseAppStoreReturn {
     levelProgress,
     promotionTrial,
     reconcileRollover,
+    reconcileTimer,
+    startTimer,
+    pauseTimer,
+    resumeTimer,
+    cancelTimer,
+    lastCompletedSession,
+    clearCompletionSummary,
     addTask,
     editTask,
     removeTask,
